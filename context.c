@@ -35,6 +35,23 @@ crawl_destroy(CRAWL *p)
     if(p)
     {
         free(p->cachefile);
+		free(p->accept);
         free(p);
     }
+}
+
+/* Set the Accept header used in requests */
+int
+crawl_set_accept(CRAWL *crawl, const char *accept)
+{
+	char *p;
+	
+	p = strdup(accept);
+	if(!p)
+	{
+		return -1;
+	}
+	free(crawl->accept);
+	crawl->accept = p;
+	return 0;
 }

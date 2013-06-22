@@ -21,7 +21,9 @@ typedef struct crawl_struct CRAWL;
 
 CRAWL *crawl_create(void);
 void crawl_destroy(CRAWL *p);
+int crawl_set_accept(CRAWL *crawl, const char *accept);
 
 int crawl_fetch(CRAWL *crawl, const char *uri);
+int crawl_perform(CRAWL *crawl);
 
 #endif /*!CRAWL_H_*/

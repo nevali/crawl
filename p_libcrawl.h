@@ -45,6 +45,8 @@ struct crawl_struct
 {
     char *cachefile;
     size_t cachefile_len;
+	char *accept;
+	char *ua;
 };
 
 struct crawl_fetch_data_struct

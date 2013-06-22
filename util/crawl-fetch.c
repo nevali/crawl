@@ -18,7 +18,10 @@
 # include "config.h"
 #endif
 
-#include "p_libcrawl.h"
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "crawl.h"
 
 /* Immediately fetch the specified URI using libcrawl */
 int
