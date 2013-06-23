@@ -65,7 +65,7 @@ crawl_fetch_uri(CRAWL *crawl, URI *uri)
 	data.ch = curl_easy_init();
 	if(crawl->uri_policy)
 	{
-		if(crawl->uri_policy(data.obj->uri, data.obj->uristr, crawl->userdata) < 1)
+		if(crawl->uri_policy(crawl, data.obj->uri, data.obj->uristr, crawl->userdata) < 1)
 		{
 			crawl_obj_destroy(data.obj);
 			return NULL;
@@ -182,6 +182,10 @@ crawl_fetch_uri(CRAWL *crawl, URI *uri)
 	{
 		crawl_obj_destroy(data.obj);
 		return NULL;
+	}
+	if(crawl->updated)
+	{
+		crawl->updated(crawl, data.obj, data.cachetime, crawl->userdata);
 	}
 	return data.obj;
 }

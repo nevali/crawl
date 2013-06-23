@@ -83,6 +83,7 @@ struct crawl_struct
 	int verbose;
 	time_t cache_min;
 	crawl_uri_policy_cb uri_policy;
+	crawl_updated_cb updated;
 };
 
 struct crawl_object_struct

@@ -136,6 +136,36 @@ crawl_obj_updated(CRAWLOBJ *obj)
 	return obj->updated;
 }
 
+int
+crawl_obj_headers(CRAWLOBJ *obj, jd_var *out, int clone)
+{
+	jd_var *key;
+	int r;
+	
+	if(obj->info.type == VOID)
+	{
+		return -1;
+	}
+	r = 0;
+	JD_SCOPE
+	{
+		key = jd_get_ks(&(obj->info), "headers", 1);
+		if(key->type == VOID)
+		{
+			r = -1;
+		}
+		else if(clone)
+		{
+			jd_clone(out, key, 1);
+		}
+		else
+		{
+			jd_assign(out, key);
+		}
+	}
+	return r;
+}
+
 /* Replace the information in a crawl object with a new dictionary */
 int
 crawl_obj_replace_(CRAWLOBJ *obj, jd_var *dict)

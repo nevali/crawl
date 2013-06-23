@@ -92,6 +92,14 @@ crawl_set_uri_policy(CRAWL *crawl, crawl_uri_policy_cb cb)
 	return 0;
 }
 
+/* Set the object-updated callback */
+int
+crawl_set_updated(CRAWL *crawl, crawl_updated_cb cb)
+{
+	crawl->updated = cb;
+	return 0;
+}
+
 /* Set the verbosity flag */
 int
 crawl_set_verbose(CRAWL *crawl, int verbose)

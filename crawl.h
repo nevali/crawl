@@ -24,7 +24,8 @@
 typedef struct crawl_struct CRAWL;
 typedef struct crawl_object_struct CRAWLOBJ;
 
-typedef int (*crawl_uri_policy_cb)(URI *uri, const char *uristr, void *userdata);
+typedef int (*crawl_uri_policy_cb)(CRAWL *crawl, URI *uri, const char *uristr, void *userdata);
+typedef int (*crawl_updated_cb)(CRAWL *crawl, CRAWLOBJ *obj, time_t prevtime, void *userdata);
 
 /* Create a crawl context */
 CRAWL *crawl_create(void);
@@ -40,6 +41,8 @@ int crawl_set_verbose(CRAWL *crawl, int verbose);
 void *crawl_userdata(CRAWL *crawl);
 /* Set the callback function used to apply a URI policy */
 int crawl_set_uri_policy(CRAWL *crawl, crawl_uri_policy_cb cb);
+/* Set the callback function invoked when an object is updated */
+int crawl_set_updated(CRAWL *crawl, crawl_updated_cb cb);
 
 /* Open the payload file for a crawl object */
 FILE *crawl_obj_open(CRAWLOBJ *obj);
@@ -51,6 +54,8 @@ const char *crawl_obj_key(CRAWLOBJ *obj);
 int crawl_obj_status(CRAWLOBJ *obj);
 /* Obtain the storage timestamp for a crawl object */
 time_t crawl_obj_updated(CRAWLOBJ *obj);
+/* Obtain the headers for a crawl object */
+int crawl_obj_headers(CRAWLOBJ *obj, jd_var *out, int clone);
 
 /* Fetch a resource specified as a string containing a URI */
 CRAWLOBJ *crawl_fetch(CRAWL *crawl, const char *uri);
