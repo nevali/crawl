@@ -56,6 +56,12 @@ time_t crawl_obj_updated(CRAWLOBJ *obj);
 CRAWLOBJ *crawl_fetch(CRAWL *crawl, const char *uri);
 /* Fetch a resource specified as a URI */
 CRAWLOBJ *crawl_fetch_uri(CRAWL *crawl, URI *uri);
+
+/* Locate a cached resource specified as a string */
+CRAWLOBJ *crawl_locate(CRAWL *crawl, const char *uristr);
+/* Locate a cached resource specified as a URI */
+CRAWLOBJ *crawl_locate_uri(CRAWL *crawl, URI *uri);
+
 /* Perform a crawling cycle */
 int crawl_perform(CRAWL *crawl);
 

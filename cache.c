@@ -23,6 +23,40 @@
 static int cache_create_dirs_(CRAWL *crawl, const char *path);
 static int cache_copy_filename_(CRAWL *crawl, const CACHEKEY key, const char *type, int temporary);
 
+CRAWLOBJ *
+crawl_locate(CRAWL *crawl, const char *uristr)
+{
+	URI *uri;
+	CRAWLOBJ *r;
+	
+	uri = uri_create_str(uristr, NULL);
+	if(!uri)
+	{
+		return NULL;
+	}
+	r = crawl_locate_uri(crawl, uri);
+	uri_destroy(uri);
+	return r;
+}
+
+CRAWLOBJ *
+crawl_locate_uri(CRAWL *crawl, URI *uri)
+{
+	CRAWLOBJ *obj;
+	
+	obj = crawl_obj_create_(crawl, uri);
+	if(!obj)
+	{
+		return NULL;
+	}
+	if(crawl_obj_locate_(obj))
+	{
+		crawl_obj_destroy(obj);
+		return NULL;
+	}
+	return obj;
+}
+
 int
 crawl_cache_key_(CRAWL *crawl, CACHEKEY dest, const char *uri)
 {
