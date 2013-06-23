@@ -22,6 +22,7 @@
 
 static size_t crawl_fetch_header_(char *ptr, size_t size, size_t nmemb, void *userdata);
 static size_t crawl_fetch_payload_(char *ptr, size_t size, size_t nmemb, void *userdata);
+static int crawl_generate_info_(struct crawl_fetch_data_struct *data, jd_var *dict);
 
 int
 crawl_fetch(CRAWL *crawl, const char *uri)
@@ -30,10 +31,12 @@ crawl_fetch(CRAWL *crawl, const char *uri)
 	struct curl_slist *headers;
 	struct tm tp;
 	char modified[64];
-	long status;
 	int rollback, error;
 	time_t now;
-
+	jd_var infoblock = JD_INIT, json = JD_INIT;
+	size_t len;
+	const char *p;
+	
 	/* XXX thread-safe curl_global_init() */
 	/* XXX apply URI policy */
 	now = time(NULL);
@@ -75,7 +78,6 @@ crawl_fetch(CRAWL *crawl, const char *uri)
 	curl_easy_setopt(data.ch, CURLOPT_VERBOSE, 1);
 	rollback = 0;
 	error = 0;
-	status = 0;
 	if(curl_easy_perform(data.ch))
 	{
 		rollback = 1;
@@ -83,14 +85,14 @@ crawl_fetch(CRAWL *crawl, const char *uri)
 	}
 	else
 	{
-		curl_easy_getinfo(data.ch, CURLINFO_RESPONSE_CODE, &status);
+		curl_easy_getinfo(data.ch, CURLINFO_RESPONSE_CODE, &(data.status));
 	}
-	if(status == 304)
+	if(data.status == 304)
 	{
 		/* Not modified; rollback with successful return */
 		rollback = 1;
 	}
-	else if(status >= 500)
+	else if(data.status >= 500)
 	{
 		/* rollback if there's already a cached version */
 		error = -1;
@@ -99,10 +101,34 @@ crawl_fetch(CRAWL *crawl, const char *uri)
 			rollback = 1;
 		}
 	}
-	else if(status != 200)
+	else if(data.status != 200)
 	{
 		error = -1;
 	}	
+	if(!rollback)
+	{
+		JD_SCOPE
+		{
+			data.info = cache_open_info_write_(data.crawl, data.cachekey);
+			if(crawl_generate_info_(&data, &infoblock))
+			{
+				rollback = 1;
+				error = -1;
+			}
+			else
+			{
+				jd_to_json(&json, &infoblock);
+				p = jd_bytes(&json, &len);
+				len--;				
+				if(!p || (fwrite(p, len, 1, data.info) != 1))
+				{
+					rollback = 1;
+					error = -1;
+				}
+			}
+			jd_release(&infoblock);			
+		}
+	}
 	free(data.headers);
 	if(rollback)
 	{
@@ -158,20 +184,6 @@ crawl_fetch_payload_(char *ptr, size_t size, size_t nmemb, void *userdata)
 	data = (struct crawl_fetch_data_struct *) userdata;    
 	if(!data->payload)
 	{
-		/* If this is the first invocation, write the headers */
-		data->info = cache_open_info_write_(data->crawl, data->cachekey);
-		if(!data->info)
-		{
-			fprintf(stderr, "failed to open cache info file for writing: %s\n", strerror(errno));
-			return 0;
-		}
-		if(data->headers)
-		{
-			if(fwrite(data->headers, data->headers_size, 1, data->info) != 1)
-			{
-				return 0;
-			}
-		}
 		data->payload = cache_open_payload_write_(data->crawl, data->cachekey);
 		if(!data->payload)
 		{
@@ -186,4 +198,80 @@ crawl_fetch_payload_(char *ptr, size_t size, size_t nmemb, void *userdata)
 	size *= nmemb;
 	fprintf(stderr, "received %lu bytes of payload\n", (unsigned long) size);
 	return size;
+}
+
+static int
+crawl_generate_info_(struct crawl_fetch_data_struct *data, jd_var *dict)
+{
+	jd_var *key, *value, *headers;
+	char *ptr, *s, *p;
+	
+	jd_set_hash(dict, 8);
+	JD_SCOPE
+	{
+		key = jd_get_ks(dict, "status", 1);
+		value = jd_niv(data->status);
+		jd_assign(key, value);
+		jd_retain(dict);
+		ptr = NULL;
+		curl_easy_getinfo(data->ch, CURLINFO_REDIRECT_URL, &ptr);
+		if(ptr)
+		{
+			key = jd_get_ks(dict, "location", 1);
+			value = jd_nsv(ptr);
+			jd_assign(key, value);
+		}
+		ptr = NULL;
+		curl_easy_getinfo(data->ch, CURLINFO_CONTENT_TYPE, &ptr);
+		if(ptr)
+		{
+			key = jd_get_ks(dict, "type", 1);
+			value = jd_nsv(ptr);
+			jd_assign(key, value);	
+		}
+		headers = jd_nhv(32);
+		s = data->headers;
+		for(;;)
+		{
+			p = strchr(s, '\n');
+			if(!p)
+			{
+				break;
+			}
+			if(s == p)
+			{
+				s = p + 1;
+				continue;
+			}
+			*p = 0;
+			p--;
+			if(*p == '\r')
+			{
+				*p = 0;
+			}
+			if(s == data->headers)
+			{
+				jd_assign(jd_get_ks(headers, ":", 1), jd_nsv(s));
+				s = p + 2;
+				continue;
+			}
+			ptr = strchr(s, ':');
+			if(!ptr)
+			{
+				s = p + 2;
+				continue;
+			}			
+			*ptr = 0;
+			ptr++;
+			if(isspace(*ptr))
+			{
+				ptr++;
+			}
+			jd_assign(jd_get_ks(headers, s, 1), jd_nsv(ptr));
+			s = p + 2;
+		}
+		key = jd_get_ks(dict, "headers", 1);
+		jd_assign(key, headers);
+	}
+	return 0;
 }

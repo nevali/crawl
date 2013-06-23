@@ -17,6 +17,9 @@
 #ifndef CRAWL_H_
 # define CRAWL_H_                      1
 
+# include <jsondata.h>
+# include <liburi.h>
+
 typedef struct crawl_struct CRAWL;
 
 CRAWL *crawl_create(void);

@@ -41,7 +41,7 @@
 
 # define HEADER_ALLOC_BLOCK            128
 # define CACHE_KEY_LEN                 32
-# define CACHE_INFO_SUFFIX             "info"
+# define CACHE_INFO_SUFFIX             "json"
 # define CACHE_PAYLOAD_SUFFIX          "payload"
 # define CACHE_TMP_SUFFIX              ".tmp"
 
@@ -70,6 +70,7 @@ struct crawl_fetch_data_struct
 	time_t cachetime;
 	FILE *info;
 	FILE *payload;
+	long status;
 };
 
 int crawl_cache_key_(CRAWL *crawl, CACHEKEY dest, const char *uri);
