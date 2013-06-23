@@ -23,21 +23,31 @@
 CRAWL *
 crawl_create(void)
 {
-    CRAWL *p;
-    
-    p = (CRAWL *) calloc(1, sizeof(CRAWL));
-    return p;
+	CRAWL *p;
+
+	p = (CRAWL *) calloc(1, sizeof(CRAWL));
+	p->cache = strdup("cache");
+	p->ua = strdup("User-Agent: Mozilla/5.0 (compatible; libcrawl; +https://github.com/nevali/crawl)");
+	p->accept = strdup("Accept: */*");
+	if(!p->cache || !p->ua || !p->accept)
+	{
+		crawl_destroy(p);
+		return NULL;
+	}
+	return p;
 }
 
 void
 crawl_destroy(CRAWL *p)
 {
-    if(p)
-    {
-        free(p->cachefile);
+	if(p)
+	{
+		free(p->cache);
+		free(p->cachefile);
+		free(p->cachetmp);
 		free(p->accept);
-        free(p);
-    }
+		free(p);
+	}
 }
 
 /* Set the Accept header used in requests */
@@ -46,11 +56,13 @@ crawl_set_accept(CRAWL *crawl, const char *accept)
 {
 	char *p;
 	
-	p = strdup(accept);
+	/* Accept: ... - 9 + strlen(accept) */
+	p = (char *) malloc(9 + strlen(accept));
 	if(!p)
 	{
 		return -1;
 	}
+	sprintf(p, "Accept: %s", accept);
 	free(crawl->accept);
 	crawl->accept = p;
 	return 0;
