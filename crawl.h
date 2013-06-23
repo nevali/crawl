@@ -17,6 +17,7 @@
 #ifndef CRAWL_H_
 # define CRAWL_H_                      1
 
+# include <stdint.h>
 # include <time.h>
 # include <jsondata.h>
 # include <liburi.h>
@@ -56,6 +57,10 @@ int crawl_obj_status(CRAWLOBJ *obj);
 time_t crawl_obj_updated(CRAWLOBJ *obj);
 /* Obtain the headers for a crawl object */
 int crawl_obj_headers(CRAWLOBJ *obj, jd_var *out, int clone);
+/* Obtain the path to the payload for the crawl object */
+const char *crawl_obj_payload(CRAWLOBJ *obj);
+/* Obtain the size of the payload */
+uint64_t crawl_obj_size(CRAWLOBJ *obj);
 
 /* Fetch a resource specified as a string containing a URI */
 CRAWLOBJ *crawl_fetch(CRAWL *crawl, const char *uri);

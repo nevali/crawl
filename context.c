@@ -105,4 +105,5 @@ int
 crawl_set_verbose(CRAWL *crawl, int verbose)
 {
 	crawl->verbose = verbose;
+	return 0;
 }

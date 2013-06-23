@@ -232,6 +232,7 @@ crawl_fetch_payload_(char *ptr, size_t size, size_t nmemb, void *userdata)
 		return 0;
 	}
 	size *= nmemb;
+	data->size += size;
 	return size;
 }
 
@@ -250,6 +251,9 @@ crawl_generate_info_(struct crawl_fetch_data_struct *data, jd_var *dict)
 		jd_assign(key, value);
 		key = jd_get_ks(dict, "updated", 1);
 		value = jd_niv(data->now);
+		jd_assign(key, value);
+		key = jd_get_ks(dict, "size", 1);
+		value = jd_niv(data->size);
 		jd_assign(key, value);
 		ptr = NULL;
 		curl_easy_getinfo(data->ch, CURLINFO_REDIRECT_URL, &ptr);

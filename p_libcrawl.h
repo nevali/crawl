@@ -96,6 +96,7 @@ struct crawl_object_struct
 	URI *uri;
 	char *uristr;
 	char *payload;
+	uint64_t size;
 };
 
 struct crawl_fetch_data_struct
@@ -111,6 +112,7 @@ struct crawl_fetch_data_struct
 	FILE *info;
 	FILE *payload;
 	long status;
+	uint64_t size;
 };
 
 CRAWLOBJ *crawl_obj_create_(CRAWL *crawl, URI *uri);

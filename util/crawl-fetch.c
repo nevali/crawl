@@ -51,6 +51,8 @@ main(int argc, char **argv)
 	printf("status: %d\n", crawl_obj_status(obj));
 	printf("updated: %ld\n", (long) crawl_obj_updated(obj));
 	printf("key: %s\n", crawl_obj_key(obj));
+	printf("payload path: %s\n", crawl_obj_payload(obj));
+	printf("payload size: %llu\n", crawl_obj_size(obj));
 	if(!crawl_obj_headers(obj, &headers, 0))
 	{
 		jd_printf("headers: %lJ\n", &headers);

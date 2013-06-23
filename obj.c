@@ -49,6 +49,14 @@ crawl_obj_create_(CRAWL *crawl, URI *uri)
 		crawl_obj_destroy(p);
 		return NULL;
 	}
+	needed = cache_filename_(crawl, p->key, CACHE_PAYLOAD_SUFFIX, NULL, 0, 0);
+	if(!needed ||
+		(p->payload = (char *) malloc(needed)) == NULL ||
+		cache_filename_(crawl, p->key, CACHE_PAYLOAD_SUFFIX, p->payload, needed, 0) != needed)
+	{
+		crawl_obj_destroy(p);
+		return NULL;
+	}
 	return p;
 }
 
@@ -124,6 +132,12 @@ crawl_obj_key(CRAWLOBJ *obj)
 	return obj->key;
 }
 
+const char *
+crawl_obj_payload(CRAWLOBJ *obj)
+{
+	return obj->payload;
+}
+
 int
 crawl_obj_status(CRAWLOBJ *obj)
 {
@@ -134,6 +148,12 @@ time_t
 crawl_obj_updated(CRAWLOBJ *obj)
 {
 	return obj->updated;
+}
+
+uint64_t
+crawl_obj_size(CRAWLOBJ *obj)
+{
+	return obj->size;
 }
 
 int
@@ -197,6 +217,11 @@ crawl_obj_update_(CRAWLOBJ *obj)
 		if(key->type != VOID)
 		{
 			obj->status = jd_get_int(key);
+		}
+		key = jd_get_ks(&(obj->info), "size", 1);
+		if(key->type != VOID)
+		{
+			obj->size = jd_get_int(key);
 		}
 	}
 	return 0;
