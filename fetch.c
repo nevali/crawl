@@ -23,25 +23,24 @@
 static size_t crawl_fetch_header_(char *ptr, size_t size, size_t nmemb, void *userdata);
 static size_t crawl_fetch_payload_(char *ptr, size_t size, size_t nmemb, void *userdata);
 static int crawl_generate_info_(struct crawl_fetch_data_struct *data, jd_var *dict);
-static char *crawl_uri_string_(CRAWL *crawl, URI *uri);
 
-int
+CRAWLOBJ *
 crawl_fetch(CRAWL *crawl, const char *uristr)
 {
 	URI *uri;
-	int r;
+	CRAWLOBJ *r;
 	
 	uri = uri_create_str(uristr, NULL);
 	if(!uri)
 	{
-		return -1;
+		return NULL;
 	}
 	r = crawl_fetch_uri(crawl, uri);
 	uri_destroy(uri);
 	return r;
 }
 
-int
+CRAWLOBJ *
 crawl_fetch_uri(CRAWL *crawl, URI *uri)
 {
 	struct crawl_fetch_data_struct data;
@@ -49,34 +48,43 @@ crawl_fetch_uri(CRAWL *crawl, URI *uri)
 	struct tm tp;
 	char modified[64];
 	int rollback, error;
-	time_t now;
 	jd_var infoblock = JD_INIT, json = JD_INIT;
 	size_t len;
-	const char *p, *uristr;
+	const char *p;
 	
-	/* XXX thread-safe curl_global_init() */
-	now = time(NULL);
 	memset(&data, 0, sizeof(data));
 	headers = NULL;
 
+	data.now = time(NULL);
 	data.crawl = crawl;
-	data.uri = uri;
-	data.ch = curl_easy_init();
-	uristr = crawl_uri_string_(crawl, uri);
-	if(!uristr)
+	data.obj = crawl_obj_create_(crawl, uri);
+	if(!data.obj)
 	{
-		return -1;
+		return NULL;
 	}
+	data.ch = curl_easy_init();
 	if(crawl->uri_policy)
 	{
-		if(crawl->uri_policy(uri, uristr, crawl->userdata) < 1)
+		if(crawl->uri_policy(data.obj->uri, data.obj->uristr, crawl->userdata) < 1)
 		{
-			return -1;
+			crawl_obj_destroy(data.obj);
+			return NULL;
 		}
 	}
-	crawl_cache_key_(crawl, data.cachekey, uristr);
-	fprintf(stderr, "URI: %s\nKey: %s\n", uristr, data.cachekey);
-	/* XXX cache lookup */
+	if(!crawl_obj_locate_(data.obj))
+	{
+		data.cachetime = data.obj->updated;
+	}
+	if(data.cachetime)
+	{
+		if(data.now - data.cachetime < crawl->cache_min)
+		{
+		    return data.obj;
+		}
+		gmtime_r(&(data.cachetime), &tp);
+		strftime(modified, sizeof(modified), "If-Modified-Since: %a, %e %b %Y %H:%M:%S %z", &tp);
+		headers = curl_slist_append(headers, modified);
+	}
 	if(crawl->accept)
 	{
 		headers = curl_slist_append(headers, crawl->accept);	
@@ -85,26 +93,28 @@ crawl_fetch_uri(CRAWL *crawl, URI *uri)
 	{
 		curl_slist_append(headers, crawl->ua);
 	}
-	if(data.cachetime)
-	{
-		if(now - data.cachetime < crawl->cache_min)
-		{
-		    return 0;
-		}
-		gmtime_r(&(data.cachetime), &tp);
-		strftime(modified, sizeof(modified), "If-Modified-Since: %a, %e %b %Y %H:%M:%S %z", &tp);
-		headers = curl_slist_append(headers, modified);
-	}
 	curl_easy_setopt(data.ch, CURLOPT_HTTPHEADER, headers);
-	curl_easy_setopt(data.ch, CURLOPT_URL, uristr);
+	curl_easy_setopt(data.ch, CURLOPT_URL, data.obj->uristr);
 	curl_easy_setopt(data.ch, CURLOPT_WRITEFUNCTION, crawl_fetch_payload_);
 	curl_easy_setopt(data.ch, CURLOPT_WRITEDATA, (void *) &data);
 	curl_easy_setopt(data.ch, CURLOPT_HEADERFUNCTION, crawl_fetch_header_);
 	curl_easy_setopt(data.ch, CURLOPT_HEADERDATA, (void *) &data);
 	curl_easy_setopt(data.ch, CURLOPT_FOLLOWLOCATION, 0);
-	curl_easy_setopt(data.ch, CURLOPT_VERBOSE, 1);
+	curl_easy_setopt(data.ch, CURLOPT_VERBOSE, crawl->verbose);
 	rollback = 0;
 	error = 0;
+	data.info = cache_open_info_write_(data.crawl, data.obj->key);
+	if(!data.info)
+	{
+		crawl_obj_destroy(data.obj);
+		return NULL;
+	}
+	data.payload = cache_open_payload_write_(crawl, data.obj->key);
+	if(!data.payload)
+	{
+		crawl_obj_destroy(data.obj);
+		return NULL;
+	}
 	if(curl_easy_perform(data.ch))
 	{
 		rollback = 1;
@@ -128,15 +138,14 @@ crawl_fetch_uri(CRAWL *crawl, URI *uri)
 			rollback = 1;
 		}
 	}
-	else if(data.status != 200)
+	else if(data.status > 399)
 	{
 		error = -1;
-	}	
+	}
 	if(!rollback)
 	{
 		JD_SCOPE
 		{
-			data.info = cache_open_info_write_(data.crawl, data.cachekey);
 			if(crawl_generate_info_(&data, &infoblock))
 			{
 				rollback = 1;
@@ -153,23 +162,33 @@ crawl_fetch_uri(CRAWL *crawl, URI *uri)
 					error = -1;
 				}
 			}
+			if(!rollback)				
+			{
+				/* Copy the info block into crawl object */
+				crawl_obj_replace_(data.obj, &infoblock);
+			}
 			jd_release(&infoblock);			
 		}
 	}
 	free(data.headers);
 	if(rollback)
 	{
-		cache_close_info_rollback_(crawl, data.cachekey, data.info);
-		cache_close_payload_rollback_(crawl, data.cachekey, data.payload);
+		cache_close_info_rollback_(crawl, data.obj->key, data.info);
+		cache_close_payload_rollback_(crawl, data.obj->key, data.payload);
 	}
 	else
 	{
-		cache_close_info_commit_(crawl, data.cachekey, data.info);
-		cache_close_payload_commit_(crawl, data.cachekey, data.payload);	
+		cache_close_info_commit_(crawl, data.obj->key, data.info);
+		cache_close_payload_commit_(crawl, data.obj->key, data.payload);	
 	}
 	curl_slist_free_all(headers);
 	curl_easy_cleanup(data.ch);
-	return error;
+	if(error)
+	{
+		crawl_obj_destroy(data.obj);
+		return NULL;
+	}
+	return data.obj;
 }
 
 static size_t
@@ -209,15 +228,6 @@ crawl_fetch_payload_(char *ptr, size_t size, size_t nmemb, void *userdata)
 	struct crawl_fetch_data_struct *data;
     
 	data = (struct crawl_fetch_data_struct *) userdata;    
-	if(!data->payload)
-	{
-		data->payload = cache_open_payload_write_(data->crawl, data->cachekey);
-		if(!data->payload)
-		{
-			fprintf(stderr, "failed to open payload for writing: %s\n", strerror(errno));
-			return 0;
-		}
-	}
 	if(fwrite(ptr, size, nmemb, data->payload) != nmemb)
 	{
 		return 0;
@@ -235,10 +245,13 @@ crawl_generate_info_(struct crawl_fetch_data_struct *data, jd_var *dict)
 	jd_set_hash(dict, 8);
 	JD_SCOPE
 	{
+		jd_retain(dict);
 		key = jd_get_ks(dict, "status", 1);
 		value = jd_niv(data->status);
 		jd_assign(key, value);
-		jd_retain(dict);
+		key = jd_get_ks(dict, "updated", 1);
+		value = jd_niv(data->now);
+		jd_assign(key, value);
 		ptr = NULL;
 		curl_easy_getinfo(data->ch, CURLINFO_REDIRECT_URL, &ptr);
 		if(ptr)
@@ -306,28 +319,4 @@ crawl_generate_info_(struct crawl_fetch_data_struct *data, jd_var *dict)
 		jd_assign(key, headers);
 	}
 	return 0;
-}
-
-static char *
-crawl_uri_string_(CRAWL *crawl, URI *uri)
-{
-	size_t needed;
-	char *p;
-	
-	needed = uri_str(uri, crawl->uribuf, crawl->uribuf_len);
-	if(needed > crawl->uribuf_len)
-	{
-		p = (char *) realloc(crawl->uribuf, needed);
-		if(!p)
-		{
-			return NULL;
-		}
-		crawl->uribuf = p;
-		crawl->uribuf_len = needed;
-		if(uri_str(uri, crawl->uribuf, crawl->uribuf_len) != needed)
-		{
-			return NULL;
-		}
-	}
-	return crawl->uribuf;
 }

@@ -34,13 +34,36 @@
 
 /* Cached object has two parts:
  *
- * JSON metadata blob <key>.meta, containing:
+ * JSON metadata blob <key>.json, containing:
  *
- * 'headers':{ } -- parsed HTTP headers (for headers appearing >1, value is an array)
+ * 'updated':       Unix timestamp of last fetch
+ * 'status':        HTTP status code
+ * 'location':      received Location header in the case of a redirect, if any
+ * 'type':          received Content-Type header, if any
+ * 'headers':{ }    parsed HTTP headers (the status line has a key of ':';
+ *                  all other values are arrays containing at least one value)
  * 
+ * e.g.:
+ * {
+ *  "headers":{
+ *    ":":"HTTP/1.1 301 Moved Permanently",
+ *    "Content-Length":["230"],
+ *    "Content-Type":["text/html; charset=iso-8859-1"],
+ *    "Date":["Sun, 23 Jun 2013 13:32:06 GMT"],
+ *    "Location":["http://example.com/"],
+ *    "Server":["Apache/2.2.22 (Unix) DAV/2 PHP/5.3.15 with Suhosin-Patch mod_ssl/2.2.22 OpenSSL/0.9.8x"]
+ *  },
+ *  "location":"http://example.com/",
+ *  "status":301,
+ *  "type":"text/html; charset=iso-8859-1",
+ *  "updated":1371997296
+ * }
+ *
+ * Accompanying the .json file is a .payload file containing the recieved body, if any.
  */
 
 # define HEADER_ALLOC_BLOCK            128
+# define OBJ_READ_BLOCK                1024
 # define CACHE_KEY_LEN                 32
 # define CACHE_INFO_SUFFIX             "json"
 # define CACHE_PAYLOAD_SUFFIX          "payload"
@@ -55,20 +78,31 @@ struct crawl_struct
 	char *cachefile;
 	char *cachetmp;
 	size_t cachefile_len;
-	char *uribuf;
-	size_t uribuf_len;
 	char *accept;
 	char *ua;
+	int verbose;
 	time_t cache_min;
 	crawl_uri_policy_cb uri_policy;
+};
+
+struct crawl_object_struct
+{
+	CRAWL *crawl;
+	CACHEKEY key;
+	time_t updated;
+	int status;
+	jd_var info;
+	URI *uri;
+	char *uristr;
+	char *payload;
 };
 
 struct crawl_fetch_data_struct
 {
 	CRAWL *crawl;
+	CRAWLOBJ *obj;
 	CURL *ch;
-	URI *uri;
-	CACHEKEY cachekey;
+	time_t now;
 	char *headers;
 	size_t headers_size;
 	size_t headers_len;
@@ -78,8 +112,13 @@ struct crawl_fetch_data_struct
 	long status;
 };
 
+CRAWLOBJ *crawl_obj_create_(CRAWL *crawl, URI *uri);
+int crawl_obj_locate_(CRAWLOBJ *obj);
+int crawl_obj_replace_(CRAWLOBJ *obj, jd_var *dict);
+
 int crawl_cache_key_(CRAWL *crawl, CACHEKEY dest, const char *uri);
 size_t cache_filename_(CRAWL *crawl, const CACHEKEY key, const char *type, char *buf, size_t bufsize, int temporary);
+FILE *cache_open_info_read_(CRAWL *crawl, const CACHEKEY key);
 FILE *cache_open_info_write_(CRAWL *crawl, const CACHEKEY key);
 FILE *cache_open_payload_write_(CRAWL *crawl, const CACHEKEY key);
 int cache_close_info_rollback_(CRAWL *crawl, const CACHEKEY key, FILE *f);

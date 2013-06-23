@@ -25,6 +25,7 @@ crawl_create(void)
 {
 	CRAWL *p;
 
+	/* XXX thread-safe curl_global_init() */
 	p = (CRAWL *) calloc(1, sizeof(CRAWL));
 	p->cache = strdup("cache");
 	p->ua = strdup("User-Agent: Mozilla/5.0 (compatible; libcrawl; +https://github.com/nevali/crawl)");
@@ -89,4 +90,11 @@ crawl_set_uri_policy(CRAWL *crawl, crawl_uri_policy_cb cb)
 {
 	crawl->uri_policy = cb;
 	return 0;
+}
+
+/* Set the verbosity flag */
+int
+crawl_set_verbose(CRAWL *crawl, int verbose)
+{
+	crawl->verbose = verbose;
 }

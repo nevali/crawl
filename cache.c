@@ -91,6 +91,16 @@ cache_open_info_write_(CRAWL *crawl, const CACHEKEY key)
 }
 
 FILE *
+cache_open_info_read_(CRAWL *crawl, const CACHEKEY key)
+{
+	if(cache_copy_filename_(crawl, key, CACHE_INFO_SUFFIX, 0))
+	{
+		return NULL;
+	}
+	return fopen(crawl->cachefile, "r");
+}
+
+FILE *
 cache_open_payload_write_(CRAWL *crawl, const CACHEKEY key)
 {
 	if(cache_copy_filename_(crawl, key, CACHE_PAYLOAD_SUFFIX, 1))

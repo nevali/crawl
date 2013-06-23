@@ -20,6 +20,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <errno.h>
 
 #include "crawl.h"
 
@@ -28,7 +30,8 @@ int
 main(int argc, char **argv)
 {
 	CRAWL *crawl;
-
+	CRAWLOBJ *obj;
+	
 	if(argc != 2)
 	{
 		fprintf(stderr, "Usage: %s URI\n", argv[0]);
@@ -36,6 +39,15 @@ main(int argc, char **argv)
 	}
 	crawl = crawl_create();
 	crawl_set_accept(crawl, "text/turtle, application/rdf+xml, text/n3, */*");
-	crawl_fetch(crawl, argv[1]);
+	obj = crawl_fetch(crawl, argv[1]);
+	if(!obj)
+	{
+		fprintf(stderr, "%s: failed to fetch resource: %s\n", argv[0], strerror(errno));
+		return 1;
+	}
+	printf("status: %d\n", crawl_obj_status(obj));
+	printf("updated: %ld\n", (long) crawl_obj_updated(obj));
+	printf("key: %s\n", crawl_obj_key(obj));
+	crawl_obj_destroy(obj);
 	return 0;
 }
