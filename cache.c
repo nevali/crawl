@@ -28,11 +28,19 @@ crawl_cache_key_(CRAWL *crawl, CACHEKEY dest, const char *uri)
 {
 	unsigned char buf[SHA256_DIGEST_LENGTH];
 	size_t c;
+	char *t;
 	
 	(void) crawl;
     
 	/* The cache key is a truncated SHA-256 of the URI */
-	SHA256((const unsigned char *) uri, strlen(uri), buf);
+	c = strlen(uri);
+	/* If there's a fragment, remove it */
+	t = strchr(uri, '#');
+	if(t)
+	{
+		c = t - uri;
+	}
+	SHA256((const unsigned char *) uri, c, buf);
 	for(c = 0; c < (CACHE_KEY_LEN / 2); c++)
 	{
 		dest += sprintf(dest, "%02x", buf[c] & 0xff);
