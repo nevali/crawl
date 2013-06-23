@@ -76,6 +76,13 @@ crawl_set_userdata(CRAWL *crawl, void *userdata)
 	return 0;
 }
 
+/* Retrieve the user-data pointer */
+void *
+crawl_userdata(CRAWL *crawl)
+{
+	return crawl->userdata;
+}
+
 /* Set the URI policy callback */
 int
 crawl_set_uri_policy(CRAWL *crawl, crawl_uri_policy_cb cb)

@@ -28,6 +28,7 @@ CRAWL *crawl_create(void);
 void crawl_destroy(CRAWL *p);
 int crawl_set_accept(CRAWL *crawl, const char *accept);
 int crawl_set_userdata(CRAWL *crawl, void *userdata);
+void *crawl_userdata(CRAWL *crawl);
 int crawl_set_uri_policy(CRAWL *crawl, crawl_uri_policy_cb cb);
 
 int crawl_fetch(CRAWL *crawl, const char *uri);
