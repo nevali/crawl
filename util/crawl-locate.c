@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <jsondata.h>
 
 #include "crawl.h"
 
@@ -31,6 +32,7 @@ main(int argc, char **argv)
 {
 	CRAWL *crawl;
 	CRAWLOBJ *obj;
+	jd_var headers = JD_INIT;
 	
 	if(argc != 2)
 	{
@@ -48,6 +50,10 @@ main(int argc, char **argv)
 	printf("status: %d\n", crawl_obj_status(obj));
 	printf("updated: %ld\n", (long) crawl_obj_updated(obj));
 	printf("key: %s\n", crawl_obj_key(obj));
+	if(!crawl_obj_headers(obj, &headers, 0))
+	{
+		jd_printf("headers: %lJ\n", &headers);
+	}
 	crawl_obj_destroy(obj);
 	crawl_destroy(crawl);
 	return 0;
