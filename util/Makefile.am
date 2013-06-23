@@ -13,6 +13,7 @@
 ##  limitations under the License.
 ##
 
-bin_PROGRAMS = crawl-fetch
+bin_PROGRAMS = crawl-fetch crawl-locate
 
 crawl_fetch_LDADD = ../libcrawl.la
+crawl_locate_LDADD = ../libcrawl.la
