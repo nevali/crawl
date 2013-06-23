@@ -196,7 +196,6 @@ crawl_fetch_payload_(char *ptr, size_t size, size_t nmemb, void *userdata)
 		return 0;
 	}
 	size *= nmemb;
-	fprintf(stderr, "received %lu bytes of payload\n", (unsigned long) size);
 	return size;
 }
 
@@ -267,7 +266,13 @@ crawl_generate_info_(struct crawl_fetch_data_struct *data, jd_var *dict)
 			{
 				ptr++;
 			}
-			jd_assign(jd_get_ks(headers, s, 1), jd_nsv(ptr));
+			key = jd_get_ks(headers, s, 1);
+			if(key->type == VOID)
+			{
+				jd_assign(key, jd_nav(1));
+			}
+			value = jd_push(key, 1);
+			jd_assign(value, jd_nsv(ptr));
 			s = p + 2;
 		}
 		key = jd_get_ks(dict, "headers", 1);
