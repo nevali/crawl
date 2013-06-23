@@ -132,15 +132,10 @@ crawl_fetch_uri(CRAWL *crawl, URI *uri)
 	else if(data.status >= 500)
 	{
 		/* rollback if there's already a cached version */
-		error = -1;
 		if(data.cachetime)
 		{
 			rollback = 1;
 		}
-	}
-	else if(data.status > 399)
-	{
-		error = -1;
 	}
 	if(!rollback)
 	{
