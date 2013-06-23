@@ -91,6 +91,14 @@ int crawl_obj_headers(CRAWLOBJ *obj, jd_var *out, int clone);
 const char *crawl_obj_payload(CRAWLOBJ *obj);
 /* Obtain the size of the payload */
 uint64_t crawl_obj_size(CRAWLOBJ *obj);
+/* Obtain the crawl object URI */
+const URI *crawl_obj_uri(CRAWLOBJ *obj);
+/* Obtain the crawl object URI as a string */
+const char *crawl_obj_uristr(CRAWLOBJ *obj);
+/* Obtain the MIME type of the payload */
+const char *crawl_obj_type(CRAWLOBJ *obj);
+/* Obtain the redirect target of the resource */
+const char *crawl_obj_redirect(CRAWLOBJ *obj);
 
 /* Fetch a resource specified as a string containing a URI */
 CRAWLOBJ *crawl_fetch(CRAWL *crawl, const char *uri);

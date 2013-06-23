@@ -186,6 +186,64 @@ crawl_obj_headers(CRAWLOBJ *obj, jd_var *out, int clone)
 	return r;
 }
 
+/* Obtain the crawl object URI */
+const URI *
+crawl_obj_uri(CRAWLOBJ *obj)
+{
+	return obj->uri;
+}
+
+/* Obtain the crawl object URI as a string */
+const char *
+crawl_obj_uristr(CRAWLOBJ *obj)
+{
+	return obj->uristr;
+}
+
+const char *
+crawl_obj_type(CRAWLOBJ *obj)
+{
+	jd_var *key;
+	const char *str;
+	
+	if(obj->info.type == VOID)
+	{
+		return NULL;
+	}
+	JD_SCOPE
+	{
+		key = jd_get_ks(&(obj->info), "type", 1);
+		if(key->type == VOID)
+		{
+			return NULL;
+		}
+		str = jd_bytes(key, NULL);
+	}
+	return str;
+}
+
+const char *
+crawl_obj_redirect(CRAWLOBJ *obj)
+{
+	jd_var *key;
+	const char *str;
+	
+	if(obj->info.type == VOID)
+	{
+		return NULL;
+	}
+	JD_SCOPE
+	{
+		key = jd_get_ks(&(obj->info), "redirect", 1);
+		if(key->type == VOID)
+		{
+			return NULL;
+		}
+		str = jd_bytes(key, NULL);
+	}
+	return str;
+}
+
 /* Replace the information in a crawl object with a new dictionary */
 int
 crawl_obj_replace_(CRAWLOBJ *obj, jd_var *dict)

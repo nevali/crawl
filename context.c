@@ -143,3 +143,11 @@ crawl_set_verbose(CRAWL *crawl, int verbose)
 	crawl->verbose = verbose;
 	return 0;
 }
+
+/* Set the fetch-next callback */
+int
+crawl_set_next(CRAWL *crawl, crawl_next_cb cb)
+{
+	crawl->next = cb;
+	return 0;
+}

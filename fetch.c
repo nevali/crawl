@@ -256,6 +256,14 @@ crawl_generate_info_(struct crawl_fetch_data_struct *data, jd_var *dict)
 		value = jd_niv(data->size);
 		jd_assign(key, value);
 		ptr = NULL;
+		curl_easy_getinfo(data->ch, CURLINFO_EFFECTIVE_URL, &ptr);
+		if(ptr)
+		{
+			key = jd_get_ks(dict, "location", 1);
+			value = jd_nsv(ptr);
+			jd_assign(key, value);
+		}
+		ptr = NULL;
 		curl_easy_getinfo(data->ch, CURLINFO_REDIRECT_URL, &ptr);
 		if(ptr)
 		{
