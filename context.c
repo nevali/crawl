@@ -47,6 +47,7 @@ crawl_destroy(CRAWL *p)
 		free(p->cachefile);
 		free(p->cachetmp);
 		free(p->accept);
+		free(p->ua);
 		free(p);
 	}
 }
@@ -68,6 +69,41 @@ crawl_set_accept(CRAWL *crawl, const char *accept)
 	crawl->accept = p;
 	return 0;
 }
+
+/* Set the User-Agent header used in requests */
+int
+crawl_set_ua(CRAWL *crawl, const char *ua)
+{
+	char *p;
+	
+	/* User-Agent: ... - 13 + strlen(ua) */
+	p = (char *) malloc(13 + strlen(ua));
+	if(!p)
+	{
+		return -1;
+	}
+	sprintf(p, "User-Agent: %s", ua);
+	free(crawl->ua);
+	crawl->ua = p;
+	return 0;
+}
+
+/* Set the cache path */
+int
+crawl_set_cache(CRAWL *crawl, const char *path)
+{
+	char *p;
+	
+	p = (char *) strdup(path);
+	if(!p)
+	{
+		return -1;
+	}
+	free(crawl->cache);
+	crawl->cache = p;
+	return 0;
+}
+
 
 /* Set the private user-data pointer */
 int

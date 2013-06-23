@@ -58,10 +58,14 @@ CRAWL *crawl_create(void);
 void crawl_destroy(CRAWL *p);
 /* Set the Accept header sent in subsequent requests */
 int crawl_set_accept(CRAWL *crawl, const char *accept);
+/* Set the User-Agent header sent in subsequent requests */
+int crawl_set_ua(CRAWL *crawl, const char *ua);
 /* Set the private user-data pointer passed to callback functions */
 int crawl_set_userdata(CRAWL *crawl, void *userdata);
 /* Set the verbose flag */
 int crawl_set_verbose(CRAWL *crawl, int verbose);
+/* Set the cache path */
+int crawl_set_cache(CRAWL *crawl, const char *path);
 /* Retrieve the private user-data pointer previously set with crawl_set_userdata() */
 void *crawl_userdata(CRAWL *crawl);
 /* Set the callback function used to apply a URI policy */
