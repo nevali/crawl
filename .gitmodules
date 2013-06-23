@@ -1,3 +1,9 @@
 [submodule "m4"]
 	path = m4
 	url = git://github.com/nevali/m4.git
+[submodule "liburi"]
+	path = liburi
+	url = git://github.com/nevali/liburi.git
+[submodule "jsondata"]
+	path = jsondata
+	url = git://github.com/AndyA/jsondata.git

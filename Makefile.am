@@ -13,9 +13,9 @@
 ##  limitations under the License.
 ##
 
-DIST_SUBDIRS = m4 util
+DIST_SUBDIRS = m4 util liburi jsondata
 
-SUBDIRS = . util
+SUBDIRS = @subdirs@ . util
 
 ACLOCAL_AMFLAGS = -I m4
 
@@ -27,3 +27,8 @@ libcrawl_la_SOURCES = p_libcrawl.h \
 	context.c cache.c fetch.c
 
 libcrawl_la_LDFLAGS = -avoid-version
+
+libcrawl_la_LIBADD = $(LIBJSONDATA_LOCAL_LIBS) $(LIBJSONDATA_LIBS) \
+	$(LIBURI_LOCAL_LIBS) $(LIBURI_LIBS) \
+	$(LIBCURL_LOCAL_LIBS) $(LIBCURL_LIBS) \
+	$(OPENSSL_LOCAL_LIBS) $(OPENSSL_LIBS)
