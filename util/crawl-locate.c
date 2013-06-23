@@ -42,6 +42,7 @@ main(int argc, char **argv)
 	if(!obj)
 	{
 		fprintf(stderr, "%s: failed to locate resource: %s\n", argv[0], strerror(errno));
+		crawl_destroy(crawl);
 		return 1;
 	}
 	printf("status: %d\n", crawl_obj_status(obj));

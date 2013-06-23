@@ -43,11 +43,13 @@ main(int argc, char **argv)
 	if(!obj)
 	{
 		fprintf(stderr, "%s: failed to fetch resource: %s\n", argv[0], strerror(errno));
+		crawl_destroy(crawl);
 		return 1;
 	}
 	printf("status: %d\n", crawl_obj_status(obj));
 	printf("updated: %ld\n", (long) crawl_obj_updated(obj));
 	printf("key: %s\n", crawl_obj_key(obj));
 	crawl_obj_destroy(obj);
+	crawl_destroy(crawl);
 	return 0;
 }
