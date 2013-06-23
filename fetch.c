@@ -55,7 +55,6 @@ crawl_fetch_uri(CRAWL *crawl, URI *uri)
 	const char *p, *uristr;
 	
 	/* XXX thread-safe curl_global_init() */
-	/* XXX apply URI policy */
 	now = time(NULL);
 	memset(&data, 0, sizeof(data));
 	headers = NULL;
@@ -67,6 +66,13 @@ crawl_fetch_uri(CRAWL *crawl, URI *uri)
 	if(!uristr)
 	{
 		return -1;
+	}
+	if(crawl->uri_policy)
+	{
+		if(crawl->uri_policy(uri, uristr, crawl->userdata) < 1)
+		{
+			return -1;
+		}
 	}
 	crawl_cache_key_(crawl, data.cachekey, uristr);
 	fprintf(stderr, "URI: %s\nKey: %s\n", uristr, data.cachekey);
@@ -81,7 +87,6 @@ crawl_fetch_uri(CRAWL *crawl, URI *uri)
 	}
 	if(data.cachetime)
 	{
-		/* XXX cachetime is less than threshold */
 		if(now - data.cachetime < crawl->cache_min)
 		{
 		    return 0;

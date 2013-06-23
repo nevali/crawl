@@ -22,9 +22,13 @@
 
 typedef struct crawl_struct CRAWL;
 
+typedef int (*crawl_uri_policy_cb)(URI *uri, const char *uristr, void *userdata);
+
 CRAWL *crawl_create(void);
 void crawl_destroy(CRAWL *p);
 int crawl_set_accept(CRAWL *crawl, const char *accept);
+int crawl_set_userdata(CRAWL *crawl, void *userdata);
+int crawl_set_uri_policy(CRAWL *crawl, crawl_uri_policy_cb cb);
 
 int crawl_fetch(CRAWL *crawl, const char *uri);
 int crawl_fetch_uri(CRAWL *crawl, URI *uri);

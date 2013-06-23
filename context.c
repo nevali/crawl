@@ -67,3 +67,19 @@ crawl_set_accept(CRAWL *crawl, const char *accept)
 	crawl->accept = p;
 	return 0;
 }
+
+/* Set the private user-data pointer */
+int
+crawl_set_userdata(CRAWL *crawl, void *userdata)
+{
+	crawl->userdata = userdata;
+	return 0;
+}
+
+/* Set the URI policy callback */
+int
+crawl_set_uri_policy(CRAWL *crawl, crawl_uri_policy_cb cb)
+{
+	crawl->uri_policy = cb;
+	return 0;
+}

@@ -50,6 +50,7 @@ typedef char CACHEKEY[CACHE_KEY_LEN+1];
 
 struct crawl_struct
 {
+	void *userdata;
 	char *cache;
 	char *cachefile;
 	char *cachetmp;
@@ -59,6 +60,7 @@ struct crawl_struct
 	char *accept;
 	char *ua;
 	time_t cache_min;
+	crawl_uri_policy_cb uri_policy;
 };
 
 struct crawl_fetch_data_struct
