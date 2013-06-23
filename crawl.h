@@ -22,11 +22,35 @@
 # include <jsondata.h>
 # include <liburi.h>
 
+/* A crawl context.
+ *
+ * Note that while libcrawl is thread-safe, a single crawl context cannot be
+ * used in multiple threads concurrently. You must either protect the context
+ * with a lock, or create separate contexts for each thread which will invoke
+ * libcrawl methods.
+ */
 typedef struct crawl_struct CRAWL;
+
+/* A crawled object, returned by a cache look-up (crawl_locate) or fetch
+ * (crawl_fetch). The same thread restrictions apply to crawled objects
+ * as to the context.
+ */
 typedef struct crawl_object_struct CRAWLOBJ;
 
+/* URI policy callback: invoked before a URI is fetched; returns 1 to proceed,
+ * 0 to skip, -1 on error.
+ */
 typedef int (*crawl_uri_policy_cb)(CRAWL *crawl, URI *uri, const char *uristr, void *userdata);
+
+/* Updated callback: invoked after a resource has been fetched and stored in
+ * the cache.
+ */
 typedef int (*crawl_updated_cb)(CRAWL *crawl, CRAWLOBJ *obj, time_t prevtime, void *userdata);
+
+/* Next callback: invoked to obtain the next URI to crawl; if *next is NULL on
+ * return, crawling ends. The URI returned via *next will be freed by libcrawl.
+ */
+typedef int (*crawl_next_cb)(CRAWL *crawl, URI **next, void *userdata);
 
 /* Create a crawl context */
 CRAWL *crawl_create(void);
@@ -44,10 +68,12 @@ void *crawl_userdata(CRAWL *crawl);
 int crawl_set_uri_policy(CRAWL *crawl, crawl_uri_policy_cb cb);
 /* Set the callback function invoked when an object is updated */
 int crawl_set_updated(CRAWL *crawl, crawl_updated_cb cb);
+/* Set the callback function invoked to get the next URI to crawl */
+int crawl_set_next(CRAWL *crawl, crawl_next_cb cb);
 
 /* Open the payload file for a crawl object */
 FILE *crawl_obj_open(CRAWLOBJ *obj);
-/* Destroy an in-memory crawl object */
+/* Destroy an (in-memory) crawl object */
 int crawl_obj_destroy(CRAWLOBJ *obj);
 /* Obtain the cache key for a crawl object */
 const char *crawl_obj_key(CRAWLOBJ *obj);
