@@ -21,6 +21,10 @@
 # include <stdlib.h>
 # include <string.h>
 # include <errno.h>
+# include <sys/types.h>
+# include <sys/stat.h>
+# include <fcntl.h>
+# include <unistd.h>
 
 # include <curl/curl.h>
 # include <openssl/sha.h>
@@ -35,23 +39,28 @@
  * 
  */
 
-# define CACHE_KEY_LEN             32
-# define CACHE_INFO_SUFFIX         "info"
-# define CACHE_PAYLOAD_SUFFIX      "payload"
+# define HEADER_ALLOC_BLOCK            128
+# define CACHE_KEY_LEN                 32
+# define CACHE_INFO_SUFFIX             "info"
+# define CACHE_PAYLOAD_SUFFIX          "payload"
+# define CACHE_TMP_SUFFIX              ".tmp"
 
 typedef char CACHEKEY[CACHE_KEY_LEN+1];
 
 struct crawl_struct
 {
-    char *cachefile;
-    size_t cachefile_len;
+	char *cache;
+	char *cachefile;
+	char *cachetmp;
+	size_t cachefile_len;
 	char *accept;
 	char *ua;
+	time_t cache_min;
 };
 
 struct crawl_fetch_data_struct
 {
-    CRAWL *crawl;
+	CRAWL *crawl;
 	CURL *ch;
 	const char *uri;
 	CACHEKEY cachekey;
@@ -63,11 +72,13 @@ struct crawl_fetch_data_struct
 	FILE *payload;
 };
 
-int crawl_cache_key(CRAWL *crawl, CACHEKEY dest, const char *uri);
-size_t cache_filename(CRAWL *crawl, const CACHEKEY key, const char *type, char *buf, size_t bufsize);
-FILE *cache_open_info_write(CRAWL *crawl, const CACHEKEY key);
-FILE *cache_open_payload_write(CRAWL *crawl, const CACHEKEY key);
-int cache_close_info_commit(CRAWL *crawl, const CACHEKEY key, FILE *f);
-int cache_close_payload_commit(CRAWL *crawl, const CACHEKEY key, FILE *f);
+int crawl_cache_key_(CRAWL *crawl, CACHEKEY dest, const char *uri);
+size_t cache_filename_(CRAWL *crawl, const CACHEKEY key, const char *type, char *buf, size_t bufsize, int temporary);
+FILE *cache_open_info_write_(CRAWL *crawl, const CACHEKEY key);
+FILE *cache_open_payload_write_(CRAWL *crawl, const CACHEKEY key);
+int cache_close_info_rollback_(CRAWL *crawl, const CACHEKEY key, FILE *f);
+int cache_close_payload_rollback_(CRAWL *crawl, const CACHEKEY key, FILE *f);
+int cache_close_info_commit_(CRAWL *crawl, const CACHEKEY key, FILE *f);
+int cache_close_payload_commit_(CRAWL *crawl, const CACHEKEY key, FILE *f);
 
 #endif /*!P_LIBCRAWL_H_*/
