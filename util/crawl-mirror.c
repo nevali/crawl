@@ -81,12 +81,8 @@ next_callback(CRAWL *crawl, URI **next, void *userdata)
 	{
 		return 0;
 	}
-	*next = uri_create_uri(queue[queue_count-1], NULL);
-	if(!*next)
-	{
-		return -1;
-	}
 	/* URI will be freed by the crawler */
+	*next = queue[queue_count-1];
 	queue[queue_count] = NULL;
 	queue_count--;
 	return 0;
