@@ -54,6 +54,8 @@ struct crawl_struct
 	char *cachefile;
 	char *cachetmp;
 	size_t cachefile_len;
+	char *uribuf;
+	size_t uribuf_len;
 	char *accept;
 	char *ua;
 	time_t cache_min;
@@ -63,7 +65,7 @@ struct crawl_fetch_data_struct
 {
 	CRAWL *crawl;
 	CURL *ch;
-	const char *uri;
+	URI *uri;
 	CACHEKEY cachekey;
 	char *headers;
 	size_t headers_size;

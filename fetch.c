@@ -23,9 +23,26 @@
 static size_t crawl_fetch_header_(char *ptr, size_t size, size_t nmemb, void *userdata);
 static size_t crawl_fetch_payload_(char *ptr, size_t size, size_t nmemb, void *userdata);
 static int crawl_generate_info_(struct crawl_fetch_data_struct *data, jd_var *dict);
+static char *crawl_uri_string_(CRAWL *crawl, URI *uri);
 
 int
-crawl_fetch(CRAWL *crawl, const char *uri)
+crawl_fetch(CRAWL *crawl, const char *uristr)
+{
+	URI *uri;
+	int r;
+	
+	uri = uri_create_str(uristr, NULL);
+	if(!uri)
+	{
+		return -1;
+	}
+	r = crawl_fetch_uri(crawl, uri);
+	uri_destroy(uri);
+	return r;
+}
+
+int
+crawl_fetch_uri(CRAWL *crawl, URI *uri)
 {
 	struct crawl_fetch_data_struct data;
 	struct curl_slist *headers;
@@ -35,7 +52,7 @@ crawl_fetch(CRAWL *crawl, const char *uri)
 	time_t now;
 	jd_var infoblock = JD_INIT, json = JD_INIT;
 	size_t len;
-	const char *p;
+	const char *p, *uristr;
 	
 	/* XXX thread-safe curl_global_init() */
 	/* XXX apply URI policy */
@@ -46,8 +63,13 @@ crawl_fetch(CRAWL *crawl, const char *uri)
 	data.crawl = crawl;
 	data.uri = uri;
 	data.ch = curl_easy_init();
-	crawl_cache_key_(crawl, data.cachekey, uri);
-	fprintf(stderr, "URI: %s\nKey: %s\n", uri, data.cachekey);
+	uristr = crawl_uri_string_(crawl, uri);
+	if(!uristr)
+	{
+		return -1;
+	}
+	crawl_cache_key_(crawl, data.cachekey, uristr);
+	fprintf(stderr, "URI: %s\nKey: %s\n", uristr, data.cachekey);
 	/* XXX cache lookup */
 	if(crawl->accept)
 	{
@@ -69,7 +91,7 @@ crawl_fetch(CRAWL *crawl, const char *uri)
 		headers = curl_slist_append(headers, modified);
 	}
 	curl_easy_setopt(data.ch, CURLOPT_HTTPHEADER, headers);
-	curl_easy_setopt(data.ch, CURLOPT_URL, uri);
+	curl_easy_setopt(data.ch, CURLOPT_URL, uristr);
 	curl_easy_setopt(data.ch, CURLOPT_WRITEFUNCTION, crawl_fetch_payload_);
 	curl_easy_setopt(data.ch, CURLOPT_WRITEDATA, (void *) &data);
 	curl_easy_setopt(data.ch, CURLOPT_HEADERFUNCTION, crawl_fetch_header_);
@@ -279,4 +301,28 @@ crawl_generate_info_(struct crawl_fetch_data_struct *data, jd_var *dict)
 		jd_assign(key, headers);
 	}
 	return 0;
+}
+
+static char *
+crawl_uri_string_(CRAWL *crawl, URI *uri)
+{
+	size_t needed;
+	char *p;
+	
+	needed = uri_str(uri, crawl->uribuf, crawl->uribuf_len);
+	if(needed > crawl->uribuf_len)
+	{
+		p = (char *) realloc(crawl->uribuf, needed);
+		if(!p)
+		{
+			return NULL;
+		}
+		crawl->uribuf = p;
+		crawl->uribuf_len = needed;
+		if(uri_str(uri, crawl->uribuf, crawl->uribuf_len) != needed)
+		{
+			return NULL;
+		}
+	}
+	return crawl->uribuf;
 }
