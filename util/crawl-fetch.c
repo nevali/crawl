@@ -27,14 +27,15 @@
 int
 main(int argc, char **argv)
 {
-    CRAWL *crawl;
-    
+	CRAWL *crawl;
+
 	if(argc != 2)
 	{
 		fprintf(stderr, "Usage: %s URI\n", argv[0]);
 		exit(EXIT_FAILURE);
 	}
-    crawl = crawl_create();
+	crawl = crawl_create();
+	crawl_set_accept(crawl, "text/turtle, application/rdf+xml, text/n3, */*");
 	crawl_fetch(crawl, argv[1]);
 	return 0;
 }
