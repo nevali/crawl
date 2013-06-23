@@ -38,7 +38,7 @@
  *
  * 'updated':       Unix timestamp of last fetch
  * 'status':        HTTP status code
- * 'location':      received Location header in the case of a redirect, if any
+ * 'redirect':      received Location header in the case of a redirect, if any
  * 'type':          received Content-Type header, if any
  * 'headers':{ }    parsed HTTP headers (the status line has a key of ':';
  *                  all other values are arrays containing at least one value)
@@ -53,7 +53,7 @@
  *    "Location":["http://example.com/"],
  *    "Server":["Apache/2.2.22 (Unix) DAV/2 PHP/5.3.15 with Suhosin-Patch mod_ssl/2.2.22 OpenSSL/0.9.8x"]
  *  },
- *  "location":"http://example.com/",
+ *  "redirect":"http://example.com/",
  *  "status":301,
  *  "type":"text/html; charset=iso-8859-1",
  *  "updated":1371997296
