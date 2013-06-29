@@ -13,9 +13,9 @@
 ##  limitations under the License.
 ##
 
-DIST_SUBDIRS = m4 util liburi jsondata
+DIST_SUBDIRS = m4 util daemon liburi jsondata
 
-SUBDIRS = @subdirs@ . util
+SUBDIRS = @subdirs@ . daemon util
 
 ACLOCAL_AMFLAGS = -I m4
 
