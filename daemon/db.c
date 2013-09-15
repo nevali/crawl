@@ -54,6 +54,8 @@ struct queue_struct
 	int cache_id;
 	int ncrawlers;
 	int ncaches;
+	char *buf;
+	size_t buflen;
 };
 
 QUEUE *
@@ -69,6 +71,10 @@ db_create(CRAWL *crawler)
 	p->api = &db_api;
 	p->refcount = 1;
 	p->crawl = crawler;
+	p->crawler_id = 1;
+	p->cache_id = 1;
+	p->ncrawlers = 1;
+	p->ncaches = 1;
 	p->db = sql_connect("mysql://root@localhost/anansi");
 	if(!p->db)
 	{
@@ -95,6 +101,7 @@ db_release(QUEUE *me)
 		{
 			sql_disconnect(me->db);
 		}
+		free(me->buf);
 		free(me);
 		return 0;
 	}
@@ -105,10 +112,12 @@ static int
 db_next(QUEUE *me, URI **next)
 {
 	SQL_STATEMENT *rs;
+	size_t needed;
+	char *p;
 	
 	*next = NULL;
 	rs = sql_queryf(me->db,
-		"SELECT \"res\".* "
+		"SELECT \"res\".\"uri\" "
 		" FROM "
 		" \"crawl_resource\" \"res\", \"crawl_root\" \"root\" "
 		" WHERE "
@@ -116,8 +125,36 @@ db_next(QUEUE *me, URI **next)
 		" \"root\".\"hash\" = \"res\".\"root\" AND "
 		" \"root\".\"earliest_update\" <= NOW() AND "
 		" \"res\".\"next_fetch\" <= NOW()", me->crawler_id);
-	
+	if(sql_stmt_eof(rs))
+	{
+		fprintf(stderr, "no results\n");
+		sql_stmt_destroy(rs);
+		return 0;
+	}
+	needed = sql_stmt_value(rs, 0, NULL, 0);
+	fprintf(stderr, "needed = %d\n", (int) needed);
+	if(needed > me->buflen)
+	{
+		p = (char *) realloc(me->buf, needed + 1);
+		if(!p)
+		{
+			sql_stmt_destroy(rs);
+			return -1;
+		}
+		me->buf = p;
+		me->buflen = needed + 1;
+	}
+	if(sql_stmt_value(rs, 0, me->buf, me->buflen) != needed)
+	{
+		sql_stmt_destroy(rs);
+		return -1;
+	}
+	*next = uri_create_str(me->buf, NULL);
 	sql_stmt_destroy(rs);
+	if(!*next)
+	{
+		return -1;
+	}
 	return 0;
 }
 
