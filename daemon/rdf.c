@@ -20,7 +20,7 @@
 # include "config.h"
 #endif
 
-#define PROCESSOR_STRUCT_DEFINED           1
+#define PROCESSOR_STRUCT_DEFINED       1
 
 #include "p_crawld.h"
 

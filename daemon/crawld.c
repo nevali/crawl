@@ -25,16 +25,15 @@ static int config_defaults(void);
 int
 main(int argc, char **argv)
 {
-	(void) argc;
-	(void) argv;
-	
-	
 	log_set_ident(argv[0]);
 	log_set_stderr(1);
 	log_set_facility(LOG_DAEMON);
 	log_set_level(LOG_NOTICE);
 	config_init(config_defaults);
-	
+	if(argc > 1)
+	{
+		config_set("global:configFile", argv[1]);
+	}	
 	if(config_load(NULL))
 	{
 		return 1;

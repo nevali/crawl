@@ -16,11 +16,10 @@
 sbin_PROGRAMS = crawld
 
 crawld_SOURCES = p_crawld.h \
-	crawld.c thread.c processor.c queue.c policy.c
+	crawld.c thread.c processor.c queue.c policy.c \
+	rdf.c db.c
 
-crawld_CPPFLAGS = @AM_CPPFLAGS@ @CPPFLAGS@ -I$(top_srcdir)/libsupport
-
-crawld_CPPFLAGS = @AM_CPPFLAGS@ @CPPFLAGS@ -I$(srcdir)/iniparser/src $(LIBRDF_CPPFLAGS) $(LIBSQL_CPPFLAGS)
+crawld_CPPFLAGS = @AM_CPPFLAGS@ @CPPFLAGS@ -I$(top_srcdir)/libsupport $(LIBRDF_CPPFLAGS) $(LIBSQL_CPPFLAGS)
 crawld_LDADD = ../libcrawl.la ../libsupport/libsupport.la -lpthread $(LIBRDF_LIBS) $(LIBSQL_LOCAL_LIBS) $(LIBSQL_LIBS)
 
 

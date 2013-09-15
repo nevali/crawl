@@ -29,17 +29,12 @@
 # include <syslog.h>
 # include <pthread.h>
 
-# include <librdf.h>
-# include <libsql.h>
-
 # include "crawl.h"
 # include "libsupport.h"
 
-extern void *crawl_thread(void *dummy);
-
 typedef struct crawl_data_struct CRAWLDATA;
-typedef struct processor_data_struct PROCESSOR;
-typedef struct queue_data_struct QUEUE;
+typedef struct processor_struct PROCESSOR;
+typedef struct queue_struct QUEUE;
 
 struct crawl_data_struct
 {
@@ -49,6 +44,38 @@ struct crawl_data_struct
 	int ncaches;
 	PROCESSOR *processor;
 	QUEUE *queue;
+};
+
+#ifndef QUEUE_STRUCT_DEFINED
+struct queue_struct
+{
+	struct queue_api_struct *api;
+};
+#endif
+
+struct queue_api_struct
+{
+	void *reserved;
+	unsigned long (*addref)(QUEUE *me);
+	unsigned long (*release)(QUEUE *me);
+	int (*next)(QUEUE *me, URI **next);
+	int (*add_uri)(QUEUE *me, URI *uri);
+	int (*add_uristr)(QUEUE *me, const char *uristr);
+};
+
+#ifndef PROCESSOR_STRUCT_DEFINED
+struct processor_struct
+{
+	struct processor_api_struct *api;
+};
+#endif
+
+struct processor_api_struct
+{
+	void *reserved;
+	unsigned long (*addref)(PROCESSOR *me);
+	unsigned long (*release)(PROCESSOR *me);
+	int (*process)(PROCESSOR *me, CRAWLOBJ *obj, const char *uri, const char *content_type);
 };
 
 void *thread_handler(void *arg);
@@ -66,5 +93,9 @@ int queue_add_uristr(CRAWL *crawler, const char *str);
 int queue_add_uri(CRAWL *crawler, URI *uri);
 
 int policy_init_crawler(CRAWL *crawler);
+
+PROCESSOR *rdf_create(CRAWL *crawler);
+
+QUEUE *db_create(CRAWL *crawler);
 
 #endif /*!P_CRAWLD_H_*/
