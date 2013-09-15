@@ -58,6 +58,41 @@ crawl_locate_uri(CRAWL *crawl, URI *uri)
 }
 
 int
+crawl_cache_key(CRAWL *restrict crawl, const char *restrict uri, char *restrict buf, size_t buflen)
+{
+	CACHEKEY k;
+	
+	crawl_cache_key_(crawl, k, uri);
+	if(buflen)
+	{
+		strncpy(buf, k, buflen - 1);
+		buf[buflen - 1] = 0;
+	}
+	return 0;
+}
+
+int
+crawl_cache_key_uri(CRAWL *restrict crawl, URI *restrict uri, char *restrict buf, size_t buflen)
+{
+	size_t needed;
+	char *uristr;
+	int r;
+	
+	needed = uri_str(uri, NULL, 0);
+	uristr = NULL;
+	if(!needed ||
+		(uristr = (char *) malloc(needed)) == NULL ||
+		uri_str(uri, uristr, needed) != needed)
+	{
+		free(uristr);
+		return -1;
+	}
+	r = crawl_cache_key(crawl, uristr, buf, buflen);
+	free(uristr);
+	return r;
+}
+
+int
 crawl_cache_key_(CRAWL *crawl, CACHEKEY dest, const char *uri)
 {
 	unsigned char buf[SHA256_DIGEST_LENGTH];

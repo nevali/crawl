@@ -161,6 +161,8 @@ crawl_fetch_uri(CRAWL *crawl, URI *uri)
 			{
 				/* Copy the info block into crawl object */
 				crawl_obj_replace_(data.obj, &infoblock);
+				/* Mark the object as fresh */
+				data.obj->fresh = 1;
 			}
 			jd_release(&infoblock);			
 		}

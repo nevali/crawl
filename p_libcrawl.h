@@ -91,6 +91,7 @@ struct crawl_object_struct
 {
 	CRAWL *crawl;
 	CACHEKEY key;
+	int fresh;
 	time_t updated;
 	int status;
 	jd_var info;

@@ -244,6 +244,13 @@ crawl_obj_redirect(CRAWLOBJ *obj)
 	return str;
 }
 
+/* Has this object been freshly-fetched? */
+int
+crawl_obj_fresh(CRAWLOBJ *obj)
+{
+	return obj->fresh;
+}
+
 /* Replace the information in a crawl object with a new dictionary */
 int
 crawl_obj_replace_(CRAWLOBJ *obj, jd_var *dict)

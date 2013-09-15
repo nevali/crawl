@@ -99,6 +99,13 @@ const char *crawl_obj_uristr(CRAWLOBJ *obj);
 const char *crawl_obj_type(CRAWLOBJ *obj);
 /* Obtain the redirect target of the resource */
 const char *crawl_obj_redirect(CRAWLOBJ *obj);
+/* Has this object been freshly-fetched? */
+int crawl_obj_fresh(CRAWLOBJ *obj);
+
+/* Determine the cache key for a resource */
+int crawl_cache_key(CRAWL *restrict crawl, const char *restrict uri, char *restrict buf, size_t buflen);
+/* Determine the cache key for a resource */
+int crawl_cache_key_uri(CRAWL *restrict crawl, URI *restrict uri, char *restrict buf, size_t buflen);
 
 /* Fetch a resource specified as a string containing a URI */
 CRAWLOBJ *crawl_fetch(CRAWL *crawl, const char *uri);
