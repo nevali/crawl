@@ -26,8 +26,12 @@
 # include <sys/stat.h>
 # include <fcntl.h>
 # include <unistd.h>
+# include <syslog.h>
+# include <pthread.h>
 
-# include "iniparser.h"
 # include "crawl.h"
+# include "libsupport.h"
+
+extern void *crawl_thread(void *dummy);
 
 #endif /*!P_CRAWLD_H_*/

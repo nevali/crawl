@@ -10,3 +10,6 @@
 [submodule "libsql"]
 	path = libsql
 	url = git://github.com/nevali/libsql.git
+[submodule "libsupport"]
+	path = libsupport
+	url = git://github.com/nevali/libsupport.git
