@@ -28,6 +28,7 @@ main(int argc, char **argv)
 	(void) argc;
 	(void) argv;
 	
+	
 	log_set_ident(argv[0]);
 	log_set_stderr(1);
 	log_set_facility(LOG_DAEMON);
@@ -40,7 +41,15 @@ main(int argc, char **argv)
 	}
 	log_set_use_config(1);
 	log_reset();
-	crawl_thread(NULL);
+
+	queue_init();
+	processor_init();
+
+	/* Perform a single thread's crawl actions */
+	thread_handler(NULL);
+	
+	processor_cleanup();
+	queue_cleanup();
 	return 0;
 }
 

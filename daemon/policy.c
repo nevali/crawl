@@ -20,34 +20,10 @@
 
 #include "p_crawld.h"
 
-void *
-thread_handler(void *arg)
+int
+policy_init_crawler(CRAWL *crawler)
 {
-	CRAWL *crawler;
-	CRAWLDATA *data;
+	(void) crawler;
 	
-	(void) arg;
-	
-	data = (CRAWLDATA *) calloc(1, sizeof(CRAWLDATA));
-	if(!data)
-	{
-		return NULL;
-	}
-	data->crawler_id = 1;
-	data->cache_id = 1;
-	data->ncrawlers = 1;
-	data->ncaches = 1;
-	crawler = crawl_create();
-	crawl_set_userdata(crawler, (void *) data);
-	crawl_set_verbose(crawler, 1);
-	processor_init_crawler(crawler, data);
-	queue_init_crawler(crawler, data);
-	policy_init_crawler(crawler);
-	
-	crawl_perform(crawler);
-
-	queue_cleanup_crawler(crawler, data);
-	processor_cleanup_crawler(crawler, data);
-	crawl_destroy(crawler);
-	return NULL;
+	return 0;
 }

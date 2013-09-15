@@ -29,9 +29,42 @@
 # include <syslog.h>
 # include <pthread.h>
 
+# include <librdf.h>
+# include <libsql.h>
+
 # include "crawl.h"
 # include "libsupport.h"
 
 extern void *crawl_thread(void *dummy);
+
+typedef struct crawl_data_struct CRAWLDATA;
+typedef struct processor_data_struct PROCESSOR;
+typedef struct queue_data_struct QUEUE;
+
+struct crawl_data_struct
+{
+	int crawler_id;
+	int cache_id;
+	int ncrawlers;
+	int ncaches;
+	PROCESSOR *processor;
+	QUEUE *queue;
+};
+
+void *thread_handler(void *arg);
+
+int processor_init(void);
+int processor_cleanup(void);
+int processor_init_crawler(CRAWL *crawler, CRAWLDATA *data);
+int processor_cleanup_crawler(CRAWL *crawl, CRAWLDATA *data);
+
+int queue_init(void);
+int queue_cleanup(void);
+int queue_init_crawler(CRAWL *crawler, CRAWLDATA *data);
+int queue_cleanup_crawler(CRAWL *crawler, CRAWLDATA *data);
+int queue_add_uristr(CRAWL *crawler, const char *str);
+int queue_add_uri(CRAWL *crawler, URI *uri);
+
+int policy_init_crawler(CRAWL *crawler);
 
 #endif /*!P_CRAWLD_H_*/
