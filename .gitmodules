@@ -7,3 +7,6 @@
 [submodule "jsondata"]
 	path = jsondata
 	url = git://github.com/AndyA/jsondata.git
+[submodule "libsql"]
+	path = libsql
+	url = git://github.com/nevali/libsql.git
