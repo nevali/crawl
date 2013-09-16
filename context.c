@@ -136,6 +136,15 @@ crawl_set_updated(CRAWL *crawl, crawl_updated_cb cb)
 	return 0;
 }
 
+
+/* Set the object-update-failed callback */
+int
+crawl_set_failed(CRAWL *crawl, crawl_failed_cb cb)
+{
+	crawl->failed = cb;
+	return 0;
+}
+
 /* Set the verbosity flag */
 int
 crawl_set_verbose(CRAWL *crawl, int verbose)

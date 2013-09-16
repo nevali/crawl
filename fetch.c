@@ -101,6 +101,9 @@ crawl_fetch_uri(CRAWL *crawl, URI *uri)
 	curl_easy_setopt(data.ch, CURLOPT_HEADERDATA, (void *) &data);
 	curl_easy_setopt(data.ch, CURLOPT_FOLLOWLOCATION, 0);
 	curl_easy_setopt(data.ch, CURLOPT_VERBOSE, crawl->verbose);
+	curl_easy_setopt(data.ch, CURLOPT_NOSIGNAL, 1);
+	curl_easy_setopt(data.ch, CURLOPT_CONNECTTIMEOUT, 30);
+	curl_easy_setopt(data.ch, CURLOPT_TIMEOUT, 120);
 	rollback = 0;
 	error = 0;
 	data.info = cache_open_info_write_(data.crawl, data.obj->key);
@@ -182,6 +185,9 @@ crawl_fetch_uri(CRAWL *crawl, URI *uri)
 	curl_easy_cleanup(data.ch);
 	if(error)
 	{
+		data.obj->status = 504;
+		data.obj->updated = time(NULL);
+		crawl->failed(crawl, data.obj, data.cachetime, crawl->userdata);
 		crawl_obj_destroy(data.obj);
 		return NULL;
 	}

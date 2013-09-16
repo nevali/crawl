@@ -85,6 +85,7 @@ struct crawl_struct
 	crawl_uri_policy_cb uri_policy;
 	crawl_updated_cb updated;
 	crawl_next_cb next;
+	crawl_failed_cb failed;
 };
 
 struct crawl_object_struct

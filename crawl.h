@@ -47,6 +47,11 @@ typedef int (*crawl_uri_policy_cb)(CRAWL *crawl, URI *uri, const char *uristr, v
  */
 typedef int (*crawl_updated_cb)(CRAWL *crawl, CRAWLOBJ *obj, time_t prevtime, void *userdata);
 
+/* Failed callback: invoked after a resource fetch was attempted but was aborted
+ * due to a hard error.
+ */
+typedef int (*crawl_failed_cb)(CRAWL *crawl, CRAWLOBJ *obj, time_t prevtime, void *userdata);
+
 /* Next callback: invoked to obtain the next URI to crawl; if *next is NULL on
  * return, crawling ends. The URI returned via *next will be freed by libcrawl.
  */
@@ -72,6 +77,8 @@ void *crawl_userdata(CRAWL *crawl);
 int crawl_set_uri_policy(CRAWL *crawl, crawl_uri_policy_cb cb);
 /* Set the callback function invoked when an object is updated */
 int crawl_set_updated(CRAWL *crawl, crawl_updated_cb cb);
+/* Set the callback function invoked when an object could not be updated */
+int crawl_set_failed(CRAWL *crawl, crawl_failed_cb cb);
 /* Set the callback function invoked to get the next URI to crawl */
 int crawl_set_next(CRAWL *crawl, crawl_next_cb cb);
 
