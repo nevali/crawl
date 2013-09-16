@@ -38,10 +38,10 @@ queue_cleanup(void)
 
 /* Initialise a crawl thread */
 int
-queue_init_crawler(CRAWL *crawler, CRAWLDATA *data)
+queue_init_crawler(CRAWL *crawler, CONTEXT *ctx)
 {
-	data->queue = db_create(crawler);
-	if(!data->queue)
+	ctx->queue = db_create(ctx);
+	if(!ctx->queue)
 	{
 		return -1;
 	}
@@ -51,23 +51,23 @@ queue_init_crawler(CRAWL *crawler, CRAWLDATA *data)
 
 /* Clean up a crawl thread */
 int
-queue_cleanup_crawler(CRAWL *crawler, CRAWLDATA *data)
+queue_cleanup_crawler(CRAWL *crawler, CONTEXT *ctx)
 {
 	(void) crawler;
 	
-	if(!data->queue)
+	if(!ctx->queue)
 	{
 		return 0;
 	}
-	data->queue->api->release(data->queue);
-	data->queue = NULL;
+	ctx->queue->api->release(ctx->queue);
+	ctx->queue = NULL;
 	return 0;
 }
 
 int
 queue_add_uristr(CRAWL *crawl, const char *uristr)
 {
-	CRAWLDATA *data;
+	CONTEXT *data;
 	
 	data = crawl_userdata(crawl);	
 	return data->queue->api->add_uristr(data->queue, uristr);
@@ -76,17 +76,29 @@ queue_add_uristr(CRAWL *crawl, const char *uristr)
 int
 queue_add_uri(CRAWL *crawl, URI *uri)
 {
-	CRAWLDATA *data;
+	CONTEXT *data;
 	
 	data = crawl_userdata(crawl);	
 	return data->queue->api->add_uri(data->queue, uri);
 }
 
+int
+queue_updated_uristr(CRAWL *crawl, const char *uristr, time_t updated, time_t last_modified, int status, time_t ttl)
+{
+	CONTEXT *data;
+	
+	data = crawl_userdata(crawl);	
+	return data->queue->api->updated_uristr(data->queue, uristr, updated, last_modified, status, ttl);
+}
+
 static int
 queue_handler(CRAWL *crawl, URI **next, void *userdata)
 {
-	CRAWLDATA *data;
+	CONTEXT *data;
 	
-	data = crawl_userdata(crawl);	
+	(void) crawl;
+	
+	data = (CONTEXT *) userdata;
+	
 	return data->queue->api->next(data->queue, next);
 }

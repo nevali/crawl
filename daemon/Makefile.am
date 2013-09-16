@@ -16,7 +16,7 @@
 sbin_PROGRAMS = crawld
 
 crawld_SOURCES = p_crawld.h \
-	crawld.c thread.c processor.c queue.c policy.c \
+	crawld.c context.c thread.c processor.c queue.c policy.c \
 	rdf.c db.c
 
 crawld_CPPFLAGS = @AM_CPPFLAGS@ @CPPFLAGS@ -I$(top_srcdir)/libsupport $(LIBRDF_CPPFLAGS) $(LIBSQL_CPPFLAGS)

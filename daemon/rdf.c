@@ -51,6 +51,7 @@ struct processor_struct
 	librdf_storage *storage;
 	librdf_model *model;
 	librdf_uri *uri;
+	char *content_type;
 	const char *parser_type;
 	FILE *fobj;
 };
@@ -97,6 +98,7 @@ rdf_release(PROCESSOR *me)
 		{
 			librdf_free_world(me->world);
 		}
+		free(me->content_type);
 		free(me);
 		return 0;
 	}
@@ -123,13 +125,39 @@ rdf_process(PROCESSOR *me, CRAWLOBJ *obj, const char *uri, const char *content_t
 static int
 rdf_preprocess(PROCESSOR *me, CRAWLOBJ *obj, const char *uri, const char *content_type)
 {
+	int status;
+	char *t;
+	
 	(void) obj;
-
+	
+	status = crawl_obj_status(obj);
+	if(status < 200 || status > 299)
+	{
+		/* Don't bother processing failed responses */
+		errno = EINVAL;
+		return -1;
+	}
 	if(!content_type)
 	{
 		/* We can't parse if we don't know what it is */
 		errno = EINVAL;
 		return -1;
+	}
+	me->content_type = strdup(content_type);
+	t = strchr(me->content_type, ';');
+	if(t)
+	{
+		*t = 0;
+		t--;
+		while(t > me->content_type)
+		{
+			if(!isspace(*t))
+			{
+				break;
+			}
+			*t = 0;
+			t--;
+		}
 	}
 	me->model = librdf_new_model(me->world, me->storage, NULL);
 	if(!me->model)
@@ -141,13 +169,31 @@ rdf_preprocess(PROCESSOR *me, CRAWLOBJ *obj, const char *uri, const char *conten
 	{
 		return -1;
 	}
-	if(!strcmp(content_type, "text/turtle"))
+	me->parser_type = NULL;
+	if(!strcmp(me->content_type, "text/turtle"))
 	{
 		me->parser_type = "turtle";
 	}
+	else if(!strcmp(me->content_type, "application/rdf+xml"))
+	{
+		me->parser_type = "rdfxml";
+	}
+	else if(!strcmp(me->content_type, "text/n3"))
+	{
+		me->parser_type = "turtle";
+	}
+	else if(!strcmp(me->content_type, "text/plain"))
+	{
+		me->parser_type = "ntriples";
+	}
+	else if(!strcmp(me->content_type, "text/html"))
+	{
+		me->parser_type = "rdfa";
+	}
+	log_printf(LOG_DEBUG, "rdf_preprocess: content_type='%s', parser_type='%s'\n", me->content_type, me->parser_type);
 	if(!me->parser_type)
 	{
-		fprintf(stderr, "[rdf_begin: no suitable parser type found for '%s']\n", content_type);
+		log_printf(LOG_WARNING, "RDF: No suitable parser type found for '%s'\n", me->content_type);
 		errno = EINVAL;
 		return -1;
 	}
@@ -176,6 +222,8 @@ rdf_postprocess(PROCESSOR *me, CRAWLOBJ *obj, const char *uri, const char *conte
 		librdf_free_model(me->model);
 		me->model = NULL;
 	}
+	free(me->content_type);
+	me->content_type = NULL;
 	return 0;
 }
 
@@ -202,7 +250,7 @@ rdf_process_obj(PROCESSOR *me, CRAWLOBJ *obj, const char *uri, const char *conte
 	}
 	if(librdf_parser_parse_file_handle_into_model(parser, me->fobj, 0, me->uri, me->model))
 	{
-		fprintf(stderr, "[rdf_process: parse as '%s' failed]\n", me->parser_type);
+		log_printf(LOG_NOTICE, "RDF: failed to parse '%s' (%s) as '%s'\n", uri, content_type, me->parser_type);
 		librdf_free_parser(parser);
 		return -1;		
 	}

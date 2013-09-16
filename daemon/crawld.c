@@ -25,7 +25,18 @@ static int config_defaults(void);
 int
 main(int argc, char **argv)
 {
-	log_set_ident(argv[0]);
+	char *t;
+	
+	t = strrchr(argv[0], '/');
+	if(t)
+	{
+		t++;
+	}
+	else
+	{
+		t = argv[0];
+	}
+	log_set_ident(t);
 	log_set_stderr(1);
 	log_set_facility(LOG_DAEMON);
 	log_set_level(LOG_NOTICE);
@@ -45,7 +56,7 @@ main(int argc, char **argv)
 	processor_init();
 
 	/* Perform a single thread's crawl actions */
-	thread_handler(NULL);
+	thread_create(0);
 	
 	processor_cleanup();
 	queue_cleanup();

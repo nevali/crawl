@@ -21,6 +21,7 @@
 #include "p_crawld.h"
 
 static int processor_handler(CRAWL *crawl, CRAWLOBJ *obj, time_t prevtime, void *userdata);
+static int processor_failed_handler(CRAWL *crawl, CRAWLOBJ *obj, time_t prevtime, void *userdata);
 
 int
 processor_init(void)
@@ -35,7 +36,7 @@ processor_cleanup(void)
 }
 
 int
-processor_init_crawler(CRAWL *crawl, CRAWLDATA *data)
+processor_init_crawler(CRAWL *crawl, CONTEXT *data)
 {
 	data->processor = rdf_create(crawl);
 	if(!data->processor)
@@ -43,12 +44,13 @@ processor_init_crawler(CRAWL *crawl, CRAWLDATA *data)
 		return -1;
 	}
 	crawl_set_updated(crawl, processor_handler);
+	crawl_set_failed(crawl, processor_failed_handler);
 	return 0;
 	return 0;
 }
 
 int
-processor_cleanup_crawler(CRAWL *crawl, CRAWLDATA *data)
+processor_cleanup_crawler(CRAWL *crawl, CONTEXT *data)
 {
 	(void) crawl;
 	
@@ -64,21 +66,28 @@ processor_cleanup_crawler(CRAWL *crawl, CRAWLDATA *data)
 static int
 processor_handler(CRAWL *crawl, CRAWLOBJ *obj, time_t prevtime, void *userdata)
 {
-	CRAWLDATA *data;
+	CONTEXT *data;
 	PROCESSOR *pdata;
-	const char *content_type, *uri;
+	const char *content_type, *uri, *location;
+	int r, status;
 	
 	(void) prevtime;
-
-	data = (CRAWLDATA *) userdata;
+	
+	data = (CONTEXT *) userdata;
 	pdata = data->processor;
 	uri = crawl_obj_uristr(obj);
+	location = crawl_obj_redirect(obj);
 	content_type = crawl_obj_type(obj);
-	fprintf(stderr, "[URI is '%s', Content-Type is '%s']\n", uri, content_type);
-
+	log_printf(LOG_DEBUG, "processor_handler: URI is '%s', Content-Type is '%s'\n", uri, content_type);
+	status = crawl_obj_status(obj);
+	/* If there's a redirect, ensure the redirect target will be crawled */
+	if(status >= 300 && status < 400 && location && strcmp(location, uri))
+	{
+		queue_add_uristr(crawl, location);
+	}
 	if(!crawl_obj_fresh(obj))
 	{
-		fprintf(stderr, "[processor-handler: object has not been updated]\n");
+		log_printf(LOG_DEBUG, "processor_handler: object has not been updated\n");
 		/* it's possible that the cache itself may be older than book-keeping which
 		 * depends upon it. at the very least we need to inform the queue that
 		 * the object has been processed: this should trigger some kind of state
@@ -87,6 +96,20 @@ processor_handler(CRAWL *crawl, CRAWLOBJ *obj, time_t prevtime, void *userdata)
 		 */
 //		return 0;
 	}
-	fprintf(stderr, "[processor_handler: object has been updated]\n");
-	return pdata->api->process(pdata, obj, uri, content_type);
+	log_printf(LOG_DEBUG, "processor_handler: object has been updated\n");
+	r = pdata->api->process(pdata, obj, uri, content_type);
+	queue_updated_uristr(crawl, uri, crawl_obj_updated(obj), crawl_obj_updated(obj), crawl_obj_status(obj), 3600);
+	return r;
+}
+
+static int
+processor_failed_handler(CRAWL *crawl, CRAWLOBJ *obj, time_t prevtime, void *userdata)
+{
+	CONTEXT *data;
+	const char *uri;
+	
+	data = (CONTEXT *) userdata;
+	uri = crawl_obj_uristr(obj);
+	queue_updated_uristr(crawl, uri, crawl_obj_updated(obj), crawl_obj_updated(obj), crawl_obj_status(obj), 3600);
+	return 0;
 }

@@ -20,34 +20,50 @@
 
 #include "p_crawld.h"
 
+int
+thread_create(int crawler_offset)
+{
+	CONTEXT *context;
+	
+	context = context_create(crawler_offset);
+	if(!context)
+	{
+		return -1;
+	}
+	thread_handler(context);
+	return 0;
+}
+
 void *
 thread_handler(void *arg)
 {
+	CONTEXT *context;
 	CRAWL *crawler;
-	CRAWLDATA *data;
 	
-	(void) arg;
-	
-	data = (CRAWLDATA *) calloc(1, sizeof(CRAWLDATA));
-	if(!data)
-	{
-		return NULL;
-	}
-	data->crawler_id = 1;
-	data->cache_id = 1;
-	data->ncrawlers = 1;
-	data->ncaches = 1;
-	crawler = crawl_create();
-	crawl_set_userdata(crawler, (void *) data);
-	crawl_set_verbose(crawler, 1);
-	processor_init_crawler(crawler, data);
-	queue_init_crawler(crawler, data);
+	/* no addref() of the context because this thread is given ownership of the
+	 * object.
+	 */
+	context = (CONTEXT *) arg;
+	crawler = context->crawl;
+	log_printf(LOG_DEBUG, "thread_handler: crawler=%d, cache=%d\n", context->crawler_id, context->cache_id);
+	crawl_set_verbose(crawler, config_get_int("crawl:verbose", 0));
+	processor_init_crawler(crawler, context);
+	queue_init_crawler(crawler, context);
 	policy_init_crawler(crawler);
 	
-	crawl_perform(crawler);
+	while(1)
+	{
+		if(crawl_perform(crawler))
+		{
+			log_printf(LOG_CRIT, "%s\n", strerror(errno));
+			break;
+		}
+		sleep(1);
+	}
 
-	queue_cleanup_crawler(crawler, data);
-	processor_cleanup_crawler(crawler, data);
-	crawl_destroy(crawler);
+	queue_cleanup_crawler(crawler, context);
+	processor_cleanup_crawler(crawler, context);
+
+	context->api->release(context);
 	return NULL;
 }
