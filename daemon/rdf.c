@@ -186,10 +186,6 @@ rdf_preprocess(PROCESSOR *me, CRAWLOBJ *obj, const char *uri, const char *conten
 	{
 		me->parser_type = "ntriples";
 	}
-	else if(!strcmp(me->content_type, "text/html"))
-	{
-		me->parser_type = "rdfa";
-	}
 	log_printf(LOG_DEBUG, "rdf_preprocess: content_type='%s', parser_type='%s'\n", me->content_type, me->parser_type);
 	if(!me->parser_type)
 	{
