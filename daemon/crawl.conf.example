@@ -1,0 +1,44 @@
+[global]
+;; specify the name of the module to use for queueing
+queue=db
+;; specify the name of the module to use for resource processing
+processor=rdf
+
+[crawl]
+;; if crawling should happen verbosely, set this to 1
+; verbose=1
+
+[instance]
+;; the crawler and cache IDs are used by the queue to distribute load.
+;;
+;; the crawler ID is a numeric identifier used to identify a single crawler
+;; thread, and must be both unique and used contiguously.
+;; if you specify crawler=1 and threadcount=8, then this instance of crawld
+;; would launch eight threads, identifying themselves as crawler 1, crawler 2,
+;; and so on up to crawler 8. you would then specify crawler=9 in the next
+;; instance that you configure, and so on.
+crawler=1
+threadcount=1
+;; crawlercount is set to the total number of crawling threads across
+;; all instances.
+crawlercount=1
+;; cache IDs are used to generate cache URIs, and are shared amongst all threads
+;; in an instance. again, cache IDs should be unique and used contiguously.
+cache=1
+;; cachecount is the total number of caches -- i.e., the total number of instances.
+cachecount=1
+
+
+[log]
+;; set stderr=1 to log output to standard error, not just syslog
+;stderr=1
+;; set the logging threshold level. valid values are emerg, alert, crit, err,
+;; warn, notice, info, or debug.
+;level=notice
+;; set the logging facility, valid values include user, local0..local7,
+;; although others may be valid on your system.
+;level=daemon
+
+[db]
+;; if using the 'db' queue module, specify a database connection URI
+uri=mysql://root@localhost/anansi

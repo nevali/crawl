@@ -13,6 +13,8 @@
 ##  limitations under the License.
 ##
 
+EXTRA_DIST = crawl.conf.example
+
 sbin_PROGRAMS = crawld
 
 crawld_SOURCES = p_crawld.h \
