@@ -459,7 +459,7 @@ db_updated_uristr(QUEUE *me, const char *uristr, time_t updated, time_t last_mod
 	{
 		if(sql_executef(me->db, "UPDATE \"crawl_resource\" SET \"error_count\" = \"error_count\" + 1 WHERE \"hash\" = %Q", cachekey))
 		{
-			log_printf(LOG_CRIT, "%s\n", sql_error(me->db));
+			log_printf(LOG_CRIT, "DB: %s\n", sql_error(me->db));
 			exit(1);
 		}
 	}
@@ -467,7 +467,7 @@ db_updated_uristr(QUEUE *me, const char *uristr, time_t updated, time_t last_mod
 	{
 		if(sql_executef(me->db, "UPDATE \"crawl_resource\" SET \"error_count\" = 0, \"soft_error_count\" = \"soft_error_count\" + 1 WHERE \"hash\" = %Q", cachekey))
 		{
-			log_printf(LOG_CRIT, "%s\n", sql_error(me->db));
+			log_printf(LOG_CRIT, "DB: %s\n", sql_error(me->db));
 			exit(1);
 		}
 	}
@@ -475,7 +475,7 @@ db_updated_uristr(QUEUE *me, const char *uristr, time_t updated, time_t last_mod
 	{
 		if(sql_executef(me->db, "UPDATE \"crawl_resource\" SET \"error_count\" = 0, \"soft_error_count\" = 0 WHERE \"hash\" = %Q", cachekey))
 		{
-			log_printf(LOG_CRIT, "%s\n", sql_error(me->db));
+			log_printf(LOG_CRIT, "DB: %s\n", sql_error(me->db));
 			exit(1);
 		}	
 	}	
@@ -496,19 +496,36 @@ db_insert_resource(QUEUE *me, const char *cachekey, uint32_t shortkey, const cha
 	data.uri = uri;
 	data.rootkey = rootkey;
 	
-	return sql_perform(me->db, db_insert_resource_txn, &data, TXN_MAX_RETRIES);
+	if(sql_perform(me->db, db_insert_resource_txn, &data, TXN_MAX_RETRIES))
+	{
+		log_printf(LOG_CRIT, "DB: %s\n", sql_error(me->db));
+		exit(1);
+		return -1;
+	}
+	return 0;
 }
 
 static int
 db_insert_root(QUEUE *me, const char *rootkey, const char *uri)
 {
-	struct resource_insert data;
+	struct root_insert data;
 	
+	if(!rootkey || strlen(rootkey) != 32)
+	{
+		log_printf(LOG_CRIT, "DB: invalid root key '%s'\n", rootkey);
+		abort();
+	}
 	data.me = me;
 	data.rootkey = rootkey;
 	data.uri = uri;
 		
-	return sql_perform(me->db, db_insert_root_txn, &data, TXN_MAX_RETRIES);
+	if(sql_perform(me->db, db_insert_root_txn, &data, TXN_MAX_RETRIES))
+	{
+		log_printf(LOG_CRIT, "DB: %s\n", sql_error(me->db));
+		exit(1);
+		return -1;
+	}
+	return 0;
 }
 
 /* A transaction callback returns 0 for commit, -1 for rollback and retry, 1 for rollback successfully */
@@ -523,8 +540,7 @@ db_insert_resource_txn(SQL *db, void *userdata)
 	rs = sql_queryf(db, "SELECT * FROM \"crawl_resource\" WHERE \"hash\" = %Q", data->cachekey);
 	if(!rs)
 	{
-		log_printf(LOG_CRIT, "%s\n", sql_error(db));
-		exit(1);
+		return -2;
 	}
 	if(sql_stmt_eof(rs))
 	{
@@ -534,8 +550,7 @@ db_insert_resource_txn(SQL *db, void *userdata)
 			{
 				return -1;
 			}
-			log_printf(LOG_CRIT, "%s\n", sql_error(db));
-			exit(1);
+			return -2;
 		}
 	}
 	else
@@ -547,12 +562,11 @@ db_insert_resource_txn(SQL *db, void *userdata)
 			{
 				return -1;
 			}
-			log_printf(LOG_CRIT, "%s\n", sql_error(db));
-			exit(1);
+			return -2;
 		}
 	}
 	sql_stmt_destroy(rs);
-	return 0;
+	return 1;
 }
 
 /* A transaction callback returns 0 for commit, -1 for rollback and retry, 1 for rollback successfully */
@@ -567,12 +581,11 @@ db_insert_root_txn(SQL *db, void *userdata)
 	rs = sql_queryf(db, "SELECT * FROM \"crawl_root\" WHERE \"hash\" = %Q", data->rootkey);
 	if(!rs)
 	{
-		log_printf(LOG_CRIT, "%s\n", sql_error(db));
-		exit(1);
+		return -2;
 	}
 	if(!sql_stmt_eof(rs))
 	{
-		return 1;
+		return 0;
 	}
 	sql_stmt_destroy(rs);
 	if(sql_executef(db, "INSERT INTO \"crawl_root\" (\"hash\", \"uri\", \"added\", \"earliest_update\", \"rate\") VALUES (%Q, %Q, NOW(), NOW(), 1000)", data->rootkey, data->uri))
@@ -581,8 +594,7 @@ db_insert_root_txn(SQL *db, void *userdata)
 		{
 			return -1;
 		}
-		log_printf(LOG_CRIT, "%s\n", sql_error(db));
-		exit(1);
+		return -2;
 	}
-	return 0;
+	return 1;
 }
