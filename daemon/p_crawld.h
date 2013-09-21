@@ -44,8 +44,6 @@ struct context_struct
 	CRAWL *crawl;
 	int crawler_id;
 	int cache_id;
-	int ncrawlers;
-	int ncaches;
 	PROCESSOR *processor;
 	QUEUE *queue;
 	size_t cfgbuflen;
@@ -58,9 +56,7 @@ struct context_api_struct
 	unsigned long (*addref)(CONTEXT *me);
 	unsigned long (*release)(CONTEXT *me);
 	int (*crawler_id)(CONTEXT *me);
-	int (*crawler_count)(CONTEXT *me);
 	int (*cache_id)(CONTEXT *me);
-	int (*cache_count)(CONTEXT *me);
 	CRAWL *(*crawler)(CONTEXT *me);	
 	const char *(*config_get)(CONTEXT *me, const char *key, const char *defval);
 	int (*config_get_int)(CONTEXT *me, const char *key, int defval);

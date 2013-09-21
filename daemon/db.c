@@ -21,11 +21,13 @@
 #endif
 
 #define QUEUE_STRUCT_DEFINED           1
+#define TXN_MAX_RETRIES                10
 
 #include "p_crawld.h"
 
 #include <libsql.h>
 
+static int db_migrate(SQL *restrict, const char *identifier, int newversion, void *restrict userdata);
 static unsigned long db_addref(QUEUE *me);
 static unsigned long db_release(QUEUE *me);
 static int db_next(QUEUE *me, URI **next);
@@ -34,6 +36,10 @@ static int db_add_uristr(QUEUE *me, const char *uristr);
 static int db_updated_uristr(QUEUE *me, const char *uri, time_t updated, time_t last_modified, int status, time_t ttl);
 static int db_insert_resource(QUEUE *me, const char *cachekey, uint32_t shortkey, const char *uri, const char *rootkey);
 static int db_insert_root(QUEUE *me, const char *rootkey, const char *uri);
+static int db_insert_resource_txn(SQL *db, void *userdata);
+static int db_insert_root_txn(SQL *db, void *userdata);
+static int db_log_query(SQL *restrict db, const char *restrict statement);
+static int db_log_error(SQL *restrict db, const char *restrict sqlstate, const char *restrict message);
 
 static struct queue_api_struct db_api = {
 	NULL,
@@ -60,6 +66,22 @@ struct queue_struct
 	size_t buflen;
 };
 
+struct resource_insert
+{
+	QUEUE *me;
+	const char *cachekey;
+	uint32_t shortkey;
+	const char *uri;
+	const char *rootkey;
+};
+
+struct root_insert
+{
+	QUEUE *me;
+	const char *rootkey;
+	const char *uri;
+};
+
 QUEUE *
 db_create(CONTEXT *ctx)
 {
@@ -76,15 +98,126 @@ db_create(CONTEXT *ctx)
 	p->crawl = ctx->api->crawler(ctx);
 	p->crawler_id = ctx->api->crawler_id(ctx);
 	p->cache_id = ctx->api->cache_id(ctx);
-	p->ncrawlers = ctx->api->crawler_count(ctx);
-	p->ncaches = ctx->api->cache_count(ctx);
+	p->ncrawlers = config_get_int("db:crawlercount", 0);
+	if(!p->ncrawlers)
+	{
+		log_printf(LOG_CRIT, "DB: No crawlercount has been specified in [db] section of the configuration file\n");
+		free(p);
+		return NULL;
+	}	
+	p->ncaches = config_get_int("db:cachecount", 0);
+	if(!p->ncaches)
+	{
+		log_printf(LOG_CRIT, "DB: No cachecount has been specified in [db] section of the configuration file\n");
+		free(p);
+		return NULL;
+	}	
 	p->db = sql_connect(ctx->api->config_get(ctx, "db:uri", "mysql://localhost/crawl"));
 	if(!p->db)
 	{
 		free(p);
 		return NULL;
 	}
-	return p;	
+	sql_set_querylog(p->db, db_log_query);
+	sql_set_errorlog(p->db, db_log_error);
+	if(sql_migrate(p->db, "com.github.nevali.crawl.db", db_migrate, NULL))
+	{
+		log_printf(LOG_CRIT, "DB: Database migration failed\n");
+		sql_disconnect(p->db);
+		free(p);
+		return NULL;
+	}
+	return p;
+}
+
+static int
+db_log_query(SQL *restrict db, const char *restrict statement)
+{
+	(void) db;
+	
+	log_printf(LOG_DEBUG, "DB: %s\n", statement);
+	return 0;
+}
+
+static int
+db_log_error(SQL *restrict db, const char *restrict sqlstate, const char *restrict message)
+{
+	(void) db;
+	
+	log_printf(LOG_DEBUG, "DB Error: %s: %s\n", sqlstate, message);
+	return 0;
+}
+	
+
+static int
+db_migrate(SQL *restrict sql, const char *identifier, int newversion, void *restrict userdata)
+{
+	(void) userdata;
+	(void) identifier;
+	
+	if(newversion == 0)
+	{
+		/* Return target version */
+		return 2;
+	}
+	log_printf(LOG_NOTICE, "DB: Migrating database to version %d\n", newversion);
+	if(newversion == 1)
+	{
+		if(sql_execute(sql, "DROP TABLE IF EXISTS \"crawl_root\""))
+		{
+			return -1;
+		}
+		if(sql_execute(sql, "CREATE TABLE \"crawl_root\" ("
+			"\"hash\" VARCHAR(32) NOT NULL COMMENT 'Hash of canonical root URI',"
+			"\"uri\" VARCHAR(255) NOT NULL COMMENT 'Root URI',"
+			"\"added\" DATETIME NOT NULL COMMENT 'Timestamp that this root was added',"
+			"\"last_updated\" DATETIME DEFAULT NULL COMMENT 'Timestamp of most recent fetch from this root',"
+			"\"earliest_update\" DATETIME DEFAULT NULL COMMENT 'Earliest time this root can be fetched from again',"
+			"\"rate\" INT NOT NULL DEFAULT 1000 COMMENT 'Minimum wait time in milliseconds between fetches',"
+			"PRIMARY KEY (\"hash\"),"
+			"KEY \"crawl_root_last_updated\" (\"last_updated\"),"
+			"KEY \"crawl_root_earliest_update\" (\"earliest_update\")"
+			") ENGINE=InnoDB DEFAULT CHARSET=utf8 DEFAULT COLLATE=utf8_unicode_ci"))
+		{
+			return -1;
+		}
+		return 0;
+	}
+	if(newversion == 2)
+	{
+		if(sql_execute(sql, "DROP TABLE IF EXISTS \"crawl_resource\""))
+		{
+			return -1;
+		}
+		if(sql_execute(sql, "CREATE TABLE \"crawl_resource\" ("
+			"\"hash\" VARCHAR(32) NOT NULL COMMENT 'Hash of canonical URI',"
+			"\"shorthash\" BIGINT UNSIGNED NOT NULL COMMENT 'First 32 bits of hash',"
+			"\"crawl_bucket\" INT NOT NULL COMMENT 'Assigned crawler instance',"
+			"\"cache_bucket\" INT NOT NULL COMMENT 'Assigned cache instance',"
+			"\"crawl_instance\" INT NOT NULL COMMENT 'Active crawler instance',"
+			"\"root\" VARCHAR(32) NOT NULL COMMENT 'Hash of canonical root URI',"
+			"\"updated\" DATETIME DEFAULT NULL COMMENT 'Timestamp that this resource was updated in the cache',"
+			"\"added\" DATETIME NOT NULL COMMENT 'Timestamp that this resource was added',"
+			"\"last_modified\" DATETIME DEFAULT NULL COMMENT 'Timestamp that this resource was modified',"
+			"\"status\" INT DEFAULT NULL COMMENT 'HTTP status code',"			
+			"\"uri\" VARCHAR(255) NOT NULL COMMENT 'Resource URI',"	
+			"\"next_fetch\" DATETIME NOT NULL COMMENT 'Earliest time for next fetch of this resource',"
+			"\"error_count\" INT NOT NULL DEFAULT 0 COMMENT 'Hard error count',"
+			"\"last_ttl\" INT NOT NULL DEFAULT 0 COMMENT 'Last TTL in hours',"
+			"\"soft_error_count\" INT NOT NULL DEFAULT 0 COMMENT 'Soft error count',"
+			"PRIMARY KEY (\"hash\"),"
+			"KEY \"crawl_resource_crawl_bucket\" (\"crawl_bucket\"),"
+			"KEY \"crawl_resource_cache_bucket\" (\"cache_bucket\"),"
+			"KEY \"crawl_resource_crawl_instance\" (\"crawl_instance\"),"
+			"KEY \"crawl_resource_root\" (\"root\"),"
+			"KEY \"crawl_resource_next_fetch\" (\"next_fetch\")"				
+			") ENGINE=InnoDB DEFAULT CHARSET=utf8 DEFAULT COLLATE=utf8_unicode_ci"))
+		{
+			return -1;
+		}
+		return 0;
+	}
+	return -1;
 }
 
 static unsigned long
@@ -129,6 +262,11 @@ db_next(QUEUE *me, URI **next)
 		" \"root\".\"earliest_update\" < NOW() AND "
 		" \"res\".\"next_fetch\" < NOW() "
 		" ORDER BY \"root\".\"earliest_update\" ASC, \"res\".\"next_fetch\" ASC", me->crawler_id);
+	if(!rs)
+	{
+		log_printf(LOG_CRIT, "DB: %s\n", sql_error(me->db));
+		exit(1);
+	}
 	if(sql_stmt_eof(rs))
 	{
 		log_printf(LOG_DEBUG, "db_next: queue query returned no results\n");
@@ -350,62 +488,101 @@ db_updated_uristr(QUEUE *me, const char *uristr, time_t updated, time_t last_mod
 static int
 db_insert_resource(QUEUE *me, const char *cachekey, uint32_t shortkey, const char *uri, const char *rootkey)
 {
+	struct resource_insert data;
+	
+	data.me = me;
+	data.cachekey = cachekey;
+	data.shortkey = shortkey;
+	data.uri = uri;
+	data.rootkey = rootkey;
+	
+	return sql_perform(me->db, db_insert_resource_txn, &data, TXN_MAX_RETRIES);
+}
+
+static int
+db_insert_root(QUEUE *me, const char *rootkey, const char *uri)
+{
+	struct resource_insert data;
+	
+	data.me = me;
+	data.rootkey = rootkey;
+	data.uri = uri;
+		
+	return sql_perform(me->db, db_insert_root_txn, &data, TXN_MAX_RETRIES);
+}
+
+/* A transaction callback returns 0 for commit, -1 for rollback and retry, 1 for rollback successfully */
+static int
+db_insert_resource_txn(SQL *db, void *userdata)
+{
+	struct resource_insert *data;
 	SQL_STATEMENT *rs;
 	
-	/* BEGIN */
-	rs = sql_queryf(me->db, "SELECT * FROM \"crawl_resource\" WHERE \"hash\" = %Q", cachekey);
+	data = (struct resource_insert *) userdata;
+	
+	rs = sql_queryf(db, "SELECT * FROM \"crawl_resource\" WHERE \"hash\" = %Q", data->cachekey);
 	if(!rs)
 	{
-		fprintf(stderr, "%s\n", sql_error(me->db));
+		log_printf(LOG_CRIT, "%s\n", sql_error(db));
 		exit(1);
 	}
 	if(sql_stmt_eof(rs))
 	{
-		if(sql_executef(me->db, "INSERT INTO \"crawl_resource\" (\"hash\", \"shorthash\", \"crawl_bucket\", \"cache_bucket\", \"root\", \"uri\", \"added\", \"next_fetch\") VALUES (%Q, %lu, %d, %d, %Q, %Q, NOW(), NOW())", cachekey, shortkey, (shortkey % me->ncrawlers) + 1, (shortkey % me->ncaches) + 1, rootkey, uri))
+		if(sql_executef(db, "INSERT INTO \"crawl_resource\" (\"hash\", \"shorthash\", \"crawl_bucket\", \"cache_bucket\", \"root\", \"uri\", \"added\", \"next_fetch\") VALUES (%Q, %lu, %d, %d, %Q, %Q, NOW(), NOW())", data->cachekey, data->shortkey, (data->shortkey % data->me->ncrawlers) + 1, (data->shortkey % data->me->ncaches) + 1, data->rootkey, data->uri))
 		{
-			fprintf(stderr, "%s\n", sql_error(me->db));
+			if(sql_deadlocked(db))
+			{
+				return -1;
+			}
+			log_printf(LOG_CRIT, "%s\n", sql_error(db));
 			exit(1);
 		}
 	}
 	else
 	{
 		/* XXX only update if values differ */
-		if(sql_executef(me->db, "UPDATE \"crawl_resource\" SET \"crawl_bucket\" = %d, \"cache_bucket\" = %d WHERE \"hash\" = %Q", (shortkey % me->ncrawlers) + 1, (shortkey % me->ncaches) + 1, cachekey))
+		if(sql_executef(db, "UPDATE \"crawl_resource\" SET \"crawl_bucket\" = %d, \"cache_bucket\" = %d WHERE \"hash\" = %Q", (data->shortkey % data->me->ncrawlers) + 1, (data->shortkey % data->me->ncaches) + 1, data->cachekey))
 		{
-			fprintf(stderr, "%s\n", sql_error(me->db));
-			exit(1);		
+			if(sql_deadlocked(db))
+			{
+				return -1;
+			}
+			log_printf(LOG_CRIT, "%s\n", sql_error(db));
+			exit(1);
 		}
 	}
-	/* COMMIT */
 	sql_stmt_destroy(rs);
 	return 0;
 }
 
+/* A transaction callback returns 0 for commit, -1 for rollback and retry, 1 for rollback successfully */
 static int
-db_insert_root(QUEUE *me, const char *rootkey, const char *uri)
+db_insert_root_txn(SQL *db, void *userdata)
 {
+	struct root_insert *data;
 	SQL_STATEMENT *rs;
 	
-	/* BEGIN */
-	rs = sql_queryf(me->db, "SELECT * FROM \"crawl_root\" WHERE \"hash\" = %Q", rootkey);
+	data = (struct root_insert *) userdata;
+	
+	rs = sql_queryf(db, "SELECT * FROM \"crawl_root\" WHERE \"hash\" = %Q", data->rootkey);
 	if(!rs)
 	{
-		fprintf(stderr, "%s\n", sql_error(me->db));
+		log_printf(LOG_CRIT, "%s\n", sql_error(db));
 		exit(1);
 	}
 	if(!sql_stmt_eof(rs))
 	{
-		/* ROLLBACK */
+		return 1;
 	}
-	else
-	{
-		if(sql_executef(me->db, "INSERT INTO \"crawl_root\" (\"hash\", \"uri\", \"added\", \"earliest_update\", \"rate\") VALUES (%Q, %Q, NOW(), NOW(), 1)", rootkey, uri))
-		{
-			fprintf(stderr, "%s\n", sql_error(me->db));
-			exit(1);		
-		}
-	}
-	/* COMMIT */
 	sql_stmt_destroy(rs);
+	if(sql_executef(db, "INSERT INTO \"crawl_root\" (\"hash\", \"uri\", \"added\", \"earliest_update\", \"rate\") VALUES (%Q, %Q, NOW(), NOW(), 1000)", data->rootkey, data->uri))
+	{
+		if(sql_deadlocked(db))
+		{
+			return -1;
+		}
+		log_printf(LOG_CRIT, "%s\n", sql_error(db));
+		exit(1);
+	}
 	return 0;
 }

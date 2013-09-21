@@ -23,9 +23,7 @@
 static unsigned long context_addref(CONTEXT *me);
 static unsigned long context_release(CONTEXT *me);
 static int context_crawler_id(CONTEXT *me);
-static int context_crawler_count(CONTEXT *me);
 static int context_cache_id(CONTEXT *me);
-static int context_cache_count(CONTEXT *me);
 static CRAWL *context_crawler(CONTEXT *me);
 static const char *context_config_get(CONTEXT *me, const char *key, const char *defval);
 static int context_config_get_int(CONTEXT *me, const char *key, int defval);
@@ -35,9 +33,7 @@ static struct context_api_struct context_api = {
 	context_addref,
 	context_release,
 	context_crawler_id,
-	context_crawler_count,
 	context_cache_id,
-	context_cache_count,
 	context_crawler,
 	context_config_get,
 	context_config_get_int
@@ -66,18 +62,6 @@ context_create(int crawler_offset)
 		log_printf(LOG_CRIT, "No cache ID has been specified in [instance] section of the configuration file\n");
 		e = 1;
 	}
-	p->ncrawlers = config_get_int("instance:crawlercount", 0);
-	if(!p->ncrawlers)
-	{
-		log_printf(LOG_CRIT, "No crawlercount has been specified in [instance] section of the configuration file\n");
-		e = 1;
-	}	
-	p->ncaches = config_get_int("instance:cachecount", 0);
-	if(!p->ncaches)
-	{
-		log_printf(LOG_CRIT, "No cachecount has been specified in [instance] section of the configuration file\n");
-		e = 1;
-	}	
 	if(e)
 	{
 		free(p);
@@ -124,21 +108,9 @@ context_crawler_id(CONTEXT *me)
 }
 
 static int
-context_crawler_count(CONTEXT *me)
-{
-	return me->ncrawlers;
-}
-
-static int
 context_cache_id(CONTEXT *me)
 {
 	return me->cache_id;
-}
-
-static int
-context_cache_count(CONTEXT *me)
-{
-	return me->ncaches;
 }
 
 static CRAWL *
