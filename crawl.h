@@ -52,10 +52,22 @@ typedef int (*crawl_updated_cb)(CRAWL *crawl, CRAWLOBJ *obj, time_t prevtime, vo
  */
 typedef int (*crawl_failed_cb)(CRAWL *crawl, CRAWLOBJ *obj, time_t prevtime, void *userdata);
 
+/* Unchanged callback: invoked after a resource was rolled back because there is no
+ * newer version of the resource.
+ */
+typedef int (*crawl_unchanged_cb)(CRAWL *crawl, CRAWLOBJ *obj, time_t prevtime, void *userdata);
+
 /* Next callback: invoked to obtain the next URI to crawl; if *next is NULL on
  * return, crawling ends. The URI returned via *next will be freed by libcrawl.
  */
 typedef int (*crawl_next_cb)(CRAWL *crawl, URI **next, void *userdata);
+
+/* Checkpoint callback: invoked after the response headers have been received
+ * but before the payload has been. If the callback returns a nonzero result,
+ * the fetch will be aborted.
+ */
+typedef int (*crawl_checkpoint_cb)(CRAWL *crawl, CRAWLOBJ *obj, int *status, void *userdata);
+
 
 /* Create a crawl context */
 CRAWL *crawl_create(void);
@@ -81,6 +93,10 @@ int crawl_set_updated(CRAWL *crawl, crawl_updated_cb cb);
 int crawl_set_failed(CRAWL *crawl, crawl_failed_cb cb);
 /* Set the callback function invoked to get the next URI to crawl */
 int crawl_set_next(CRAWL *crawl, crawl_next_cb cb);
+/* Set the callback function invoked before the object payload is retrieved */
+int crawl_set_checkpoint(CRAWL *crawl, crawl_checkpoint_cb cb);
+/* Set the callback function invoked when an object is rolled back */
+int crawl_set_unchanged(CRAWL *crawl, crawl_unchanged_cb cb);
 
 /* Open the payload file for a crawl object */
 FILE *crawl_obj_open(CRAWLOBJ *obj);

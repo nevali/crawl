@@ -20,8 +20,11 @@
 
 #include "p_libcrawl.h"
 
+#define MAX_HEADERS_SIZE               8192
+
 static size_t crawl_fetch_header_(char *ptr, size_t size, size_t nmemb, void *userdata);
 static size_t crawl_fetch_payload_(char *ptr, size_t size, size_t nmemb, void *userdata);
+static int crawl_update_info_(struct crawl_fetch_data_struct *data);
 static int crawl_generate_info_(struct crawl_fetch_data_struct *data, jd_var *dict);
 
 CRAWLOBJ *
@@ -47,8 +50,8 @@ crawl_fetch_uri(CRAWL *crawl, URI *uri)
 	struct curl_slist *headers;
 	struct tm tp;
 	char modified[64];
-	int rollback, error;
-	jd_var infoblock = JD_INIT, json = JD_INIT;
+	int error;
+	jd_var dict = JD_INIT, json = JD_INIT;
 	size_t len;
 	const char *p;
 	
@@ -73,22 +76,32 @@ crawl_fetch_uri(CRAWL *crawl, URI *uri)
 	}
 	if(!crawl_obj_locate_(data.obj))
 	{
+		/* Object was located in the cache */
 		data.cachetime = data.obj->updated;
-	}
-	if(data.cachetime)
-	{
 		if(data.now - data.cachetime < crawl->cache_min)
 		{
+			/* The object hasn't reached its minimum time-to-live */
+			if(crawl->unchanged)
+			{
+				crawl->unchanged(crawl, data.obj, data.cachetime, crawl->userdata);
+			}
 		    return data.obj;
 		}
+		/* Store a copy of the object dictionary to allow rolling it back without
+		 * re-reading from disk.
+		 */
+		jd_clone(&dict, &(data.obj->info), 1);
+		/* Send an If-Modified-Since header */
 		gmtime_r(&(data.cachetime), &tp);
 		strftime(modified, sizeof(modified), "If-Modified-Since: %a, %e %b %Y %H:%M:%S %z", &tp);
-		headers = curl_slist_append(headers, modified);
+		headers = curl_slist_append(headers, modified);		
 	}
+	/* Set the Accept header */
 	if(crawl->accept)
 	{
 		headers = curl_slist_append(headers, crawl->accept);	
 	}
+	/* Set the User-Agent header */
 	if(crawl->ua)
 	{
 		curl_slist_append(headers, crawl->ua);
@@ -104,92 +117,113 @@ crawl_fetch_uri(CRAWL *crawl, URI *uri)
 	curl_easy_setopt(data.ch, CURLOPT_NOSIGNAL, 1);
 	curl_easy_setopt(data.ch, CURLOPT_CONNECTTIMEOUT, 30);
 	curl_easy_setopt(data.ch, CURLOPT_TIMEOUT, 120);
-	rollback = 0;
 	error = 0;
 	data.info = cache_open_info_write_(data.crawl, data.obj->key);
 	if(!data.info)
 	{
+		jd_release(&dict);
 		crawl_obj_destroy(data.obj);
 		return NULL;
 	}
 	data.payload = cache_open_payload_write_(crawl, data.obj->key);
 	if(!data.payload)
 	{
+		jd_release(&dict);
 		crawl_obj_destroy(data.obj);
 		return NULL;
 	}
 	if(curl_easy_perform(data.ch))
 	{
-		rollback = 1;
-		error = -1;
+		if(!data.status)
+		{
+			/* Use 504 to indicate a low-level fetch error */
+			data.status = 504;
+		}
 	}
 	else
 	{
+		/* In the event that there was no payload written, data.status will be
+		 * unset, so ensure that it is
+		 */
 		curl_easy_getinfo(data.ch, CURLINFO_RESPONSE_CODE, &(data.status));
-	}
-	if(data.status == 304)
+	}	
+	if(data.cachetime && data.status == 304)
 	{
 		/* Not modified; rollback with successful return */
-		rollback = 1;
+		data.rollback = 1;
 	}
 	else if(data.status >= 500)
 	{
 		/* rollback if there's already a cached version */
 		if(data.cachetime)
 		{
-			rollback = 1;
+			data.rollback = 1;
 		}
 	}
-	if(!rollback)
+	if(!data.rollback)
 	{
 		JD_SCOPE
 		{
-			if(crawl_generate_info_(&data, &infoblock))
+			if(crawl_update_info_(&data))
 			{
-				rollback = 1;
+				data.rollback = 1;
 				error = -1;
-			}
-			else
-			{
-				jd_to_json(&json, &infoblock);
+				jd_to_json(&json, &(data.obj->info));
 				p = jd_bytes(&json, &len);
 				len--;				
 				if(!p || (fwrite(p, len, 1, data.info) != 1))
 				{
-					rollback = 1;
+					data.rollback = 1;
 					error = -1;
 				}
+				else
+				{
+					data.obj->fresh = 1;			
+				}
 			}
-			if(!rollback)				
+			if(data.rollback)
 			{
-				/* Copy the info block into crawl object */
-				crawl_obj_replace_(data.obj, &infoblock);
-				/* Mark the object as fresh */
-				data.obj->fresh = 1;
+				crawl_obj_replace_(data.obj, &dict);
 			}
-			jd_release(&infoblock);			
 		}
 	}
 	free(data.headers);
-	if(rollback)
+	jd_release(&dict);
+	if(data.rollback)
 	{
 		cache_close_info_rollback_(crawl, data.obj->key, data.info);
 		cache_close_payload_rollback_(crawl, data.obj->key, data.payload);
+		/* restore info */
 	}
 	else
 	{
 		cache_close_info_commit_(crawl, data.obj->key, data.info);
 		cache_close_payload_commit_(crawl, data.obj->key, data.payload);	
-	}
+	}	
 	curl_slist_free_all(headers);
 	curl_easy_cleanup(data.ch);
+	/* If we rolled back and there was nothing to roll back to, consider
+	 * it an error */
+	if(data.rollback && !data.cachetime)
+	{
+		error = -1;
+	}
 	if(error)
 	{
-		data.obj->status = 504;
-		data.obj->updated = time(NULL);
-		crawl->failed(crawl, data.obj, data.cachetime, crawl->userdata);
+		if(crawl->failed)
+		{
+			crawl->failed(crawl, data.obj, data.cachetime, crawl->userdata);
+		}
 		crawl_obj_destroy(data.obj);
 		return NULL;
+	}
+	if(!data.obj->fresh)
+	{
+		if(crawl->unchanged)
+		{
+			crawl->unchanged(crawl, data.obj, data.cachetime, crawl->userdata);
+		}
+		return data.obj;
 	}
 	if(crawl->updated)
 	{
@@ -214,7 +248,10 @@ crawl_fetch_header_(char *ptr, size_t size, size_t nmemb, void *userdata)
 	}
 	if(n != data->headers_size)
 	{
-		/* XXX check data->headers_size against maximum and abort if too large */
+		if(n > MAX_HEADERS_SIZE)
+		{
+			return 0;
+		}
 		p = (char *) realloc(data->headers, n);
 		if(!p)
 		{
@@ -233,8 +270,21 @@ static size_t
 crawl_fetch_payload_(char *ptr, size_t size, size_t nmemb, void *userdata)
 {
 	struct crawl_fetch_data_struct *data;
-    
+	
 	data = (struct crawl_fetch_data_struct *) userdata;    
+	if(crawl_update_info_(data))
+	{
+		return 0;
+	}
+	if(data->rollback)
+	{
+		return 0;
+	}
+	if(!data->have_size)
+	{
+		data->have_size = 1;
+		data->size = 0;
+	}
 	if(fwrite(ptr, size, nmemb, data->payload) != nmemb)
 	{
 		return 0;
@@ -242,6 +292,53 @@ crawl_fetch_payload_(char *ptr, size_t size, size_t nmemb, void *userdata)
 	size *= nmemb;
 	data->size += size;
 	return size;
+}
+
+/* Create or update the object's dictionary */
+static int
+crawl_update_info_(struct crawl_fetch_data_struct *data)
+{
+	jd_var infoblock = JD_INIT;
+	jd_var *key, *value;
+	int status;
+	
+	JD_SCOPE
+	{
+		if(!data->generated_info)
+		{
+			curl_easy_getinfo(data->ch, CURLINFO_RESPONSE_CODE, &(data->status));			
+			crawl_generate_info_(data, &infoblock);
+			crawl_obj_replace_(data->obj, &infoblock);
+			jd_release(&infoblock);
+			data->generated_info = 1;
+		}
+		if(data->obj->status != data->status)
+		{
+			key = jd_get_ks(&(data->obj->info), "status", 1);
+			value = jd_niv(data->status);
+			data->obj->status = data->status;
+		}
+		if(data->have_size)
+		{
+			key = jd_get_ks(&(data->obj->info), "size", 1);
+			value = jd_niv(data->size);
+			jd_assign(key, value);
+			data->obj->size = data->size;
+		}
+	}
+	if(!data->checkpoint_invoked && data->crawl->checkpoint)
+	{
+		data->checkpoint_invoked = 1;
+		status = data->status;		
+		if(data->crawl->checkpoint(data->crawl, data->obj, &status, data->crawl->userdata))
+		{
+			data->status = data->obj->status = status;
+			data->rollback = 1;
+			return 0;
+		}
+		
+	}
+	return 0;
 }
 
 static int
@@ -255,13 +352,16 @@ crawl_generate_info_(struct crawl_fetch_data_struct *data, jd_var *dict)
 	{
 		jd_retain(dict);
 		key = jd_get_ks(dict, "status", 1);
-		value = jd_niv(data->status);
+		value = jd_niv(data->status);		
 		jd_assign(key, value);
+		if(data->have_size)
+		{
+			key = jd_get_ks(dict, "size", 1);
+			value = jd_niv(data->size);
+			jd_assign(key, value);
+		}
 		key = jd_get_ks(dict, "updated", 1);
 		value = jd_niv(data->now);
-		jd_assign(key, value);
-		key = jd_get_ks(dict, "size", 1);
-		value = jd_niv(data->size);
 		jd_assign(key, value);
 		ptr = NULL;
 		curl_easy_getinfo(data->ch, CURLINFO_EFFECTIVE_URL, &ptr);
@@ -288,8 +388,7 @@ crawl_generate_info_(struct crawl_fetch_data_struct *data, jd_var *dict)
 			jd_assign(key, value);	
 		}
 		headers = jd_nhv(32);
-		s = data->headers;
-		for(;;)
+		for(s = data->headers; s; )
 		{
 			p = strchr(s, '\n');
 			if(!p)

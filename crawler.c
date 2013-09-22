@@ -23,6 +23,7 @@
 int
 crawl_perform(CRAWL *crawl)
 {
+	CRAWLOBJ *obj;
 	URI *uri;
 	int r;
 	
@@ -43,8 +44,12 @@ crawl_perform(CRAWL *crawl)
 		{
 			break;
 		}
-		if(!crawl_fetch_uri(crawl, uri))
+		obj = crawl_fetch_uri(crawl, uri);
+		if(!obj)
 		{
+			/* Check whether there was a failed callback that would have been
+			 * invoked by crawl_fetch_uri()
+			 */
 			if(!crawl->failed)
 			{
 				/* there was no callback to invoke, so simply break */
@@ -52,6 +57,7 @@ crawl_perform(CRAWL *crawl)
 				return -1;				   
 			}
 		}
+		crawl_obj_destroy(obj);
 		uri_destroy(uri);
 	}
 	return 0;

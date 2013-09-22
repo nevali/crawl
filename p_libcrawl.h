@@ -86,6 +86,8 @@ struct crawl_struct
 	crawl_updated_cb updated;
 	crawl_next_cb next;
 	crawl_failed_cb failed;
+	crawl_checkpoint_cb checkpoint;
+	crawl_unchanged_cb unchanged;
 };
 
 struct crawl_object_struct
@@ -107,6 +109,7 @@ struct crawl_fetch_data_struct
 	CRAWL *crawl;
 	CRAWLOBJ *obj;
 	CURL *ch;
+	int rollback;
 	time_t now;
 	char *headers;
 	size_t headers_size;
@@ -115,7 +118,10 @@ struct crawl_fetch_data_struct
 	FILE *info;
 	FILE *payload;
 	long status;
+	int have_size;
 	uint64_t size;
+	int generated_info;
+	int checkpoint_invoked;
 };
 
 CRAWLOBJ *crawl_obj_create_(CRAWL *crawl, URI *uri);

@@ -160,3 +160,19 @@ crawl_set_next(CRAWL *crawl, crawl_next_cb cb)
 	crawl->next = cb;
 	return 0;
 }
+
+/* Set the checkpoint callback */
+int
+crawl_set_checkpoint(CRAWL *crawl, crawl_checkpoint_cb cb)
+{
+	crawl->checkpoint = cb;
+	return 0;
+}
+
+/* Set the unchanged callback */
+int
+crawl_set_unchanged(CRAWL *crawl, crawl_unchanged_cb cb)
+{
+	crawl->unchanged = cb;
+	return 0;
+}
