@@ -176,3 +176,11 @@ crawl_set_unchanged(CRAWL *crawl, crawl_unchanged_cb cb)
 	crawl->unchanged = cb;
 	return 0;
 }
+
+/* Set the prefetch callback */
+int
+crawl_set_prefetch(CRAWL *crawl, crawl_prefetch_cb cb)
+{
+	crawl->prefetch = cb;
+	return 0;
+}

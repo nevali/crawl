@@ -88,6 +88,7 @@ struct crawl_struct
 	crawl_failed_cb failed;
 	crawl_checkpoint_cb checkpoint;
 	crawl_unchanged_cb unchanged;
+	crawl_prefetch_cb prefetch;
 };
 
 struct crawl_object_struct

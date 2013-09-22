@@ -66,15 +66,7 @@ crawl_fetch_uri(CRAWL *crawl, URI *uri)
 		return NULL;
 	}
 	data.ch = curl_easy_init();
-	if(crawl->uri_policy)
-	{
-		if(crawl->uri_policy(crawl, data.obj->uri, data.obj->uristr, crawl->userdata) < 1)
-		{
-			crawl_obj_destroy(data.obj);
-			return NULL;
-		}
-	}
-	if(!crawl_obj_locate_(data.obj))
+	if(crawl_obj_locate_(data.obj) == 0)
 	{
 		/* Object was located in the cache */
 		data.cachetime = data.obj->updated;
@@ -95,6 +87,18 @@ crawl_fetch_uri(CRAWL *crawl, URI *uri)
 		gmtime_r(&(data.cachetime), &tp);
 		strftime(modified, sizeof(modified), "If-Modified-Since: %a, %e %b %Y %H:%M:%S %z", &tp);
 		headers = curl_slist_append(headers, modified);		
+	}
+	if(crawl->uri_policy)
+	{
+		if(crawl->uri_policy(crawl, data.obj->uri, data.obj->uristr, crawl->userdata) < 1)
+		{
+			if(crawl->failed)
+			{
+				crawl->failed(crawl, data.obj, data.cachetime, crawl->userdata);
+			}		
+			crawl_obj_destroy(data.obj);
+			return NULL;
+		}
 	}
 	/* Set the Accept header */
 	if(crawl->accept)
@@ -131,6 +135,10 @@ crawl_fetch_uri(CRAWL *crawl, URI *uri)
 		jd_release(&dict);
 		crawl_obj_destroy(data.obj);
 		return NULL;
+	}
+	if(crawl->prefetch)
+	{
+		crawl->prefetch(crawl, data.obj->uri, data.obj->uristr, crawl->userdata);
 	}
 	if(curl_easy_perform(data.ch))
 	{

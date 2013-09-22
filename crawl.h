@@ -42,6 +42,11 @@ typedef struct crawl_object_struct CRAWLOBJ;
  */
 typedef int (*crawl_uri_policy_cb)(CRAWL *crawl, URI *uri, const char *uristr, void *userdata);
 
+/* Pre-fetch callback: invoked immediately before a URI is fetched (and after
+ * the policy callback, if any).
+ */
+typedef int (*crawl_prefetch_cb)(CRAWL *crawl, URI *uri, const char *uristr, void *userdata);
+
 /* Updated callback: invoked after a resource has been fetched and stored in
  * the cache.
  */
