@@ -33,7 +33,10 @@ static unsigned long db_release(QUEUE *me);
 static int db_next(QUEUE *me, URI **next);
 static int db_add_uri(QUEUE *me, URI *uristr);
 static int db_add_uristr(QUEUE *me, const char *uristr);
+static int db_updated_uri(QUEUE *me, URI *uri, time_t updated, time_t last_modified, int status, time_t ttl);
 static int db_updated_uristr(QUEUE *me, const char *uri, time_t updated, time_t last_modified, int status, time_t ttl);
+static int db_unchanged_uri(QUEUE *me, URI *uri, int error);
+static int db_unchanged_uristr(QUEUE *me, const char *uristr, int error);
 static int db_insert_resource(QUEUE *me, const char *cachekey, uint32_t shortkey, const char *uri, const char *rootkey);
 static int db_insert_root(QUEUE *me, const char *rootkey, const char *uri);
 static int db_insert_resource_txn(SQL *db, void *userdata);
@@ -48,7 +51,10 @@ static struct queue_api_struct db_api = {
 	db_next,
 	db_add_uri,
 	db_add_uristr,
-	db_updated_uristr
+	db_updated_uri,
+	db_updated_uristr,
+	db_unchanged_uri,
+	db_unchanged_uristr
 };
 
 struct queue_struct
@@ -118,8 +124,15 @@ db_create(CONTEXT *ctx)
 		free(p);
 		return NULL;
 	}
-	sql_set_querylog(p->db, db_log_query);
-	sql_set_errorlog(p->db, db_log_error);
+	if(config_get_int("db:debug-queries", 0))
+	{
+		sql_set_querylog(p->db, db_log_query);
+		sql_set_errorlog(p->db, db_log_error);
+	}
+	else if(config_get_int("db:debug-errors", 0))
+	{
+		sql_set_errorlog(p->db, db_log_error);
+	}
 	if(sql_migrate(p->db, "com.github.nevali.crawl.db", db_migrate, NULL))
 	{
 		log_printf(LOG_CRIT, "DB: Database migration failed\n");
@@ -194,7 +207,7 @@ db_migrate(SQL *restrict sql, const char *identifier, int newversion, void *rest
 			"\"shorthash\" BIGINT UNSIGNED NOT NULL COMMENT 'First 32 bits of hash',"
 			"\"crawl_bucket\" INT NOT NULL COMMENT 'Assigned crawler instance',"
 			"\"cache_bucket\" INT NOT NULL COMMENT 'Assigned cache instance',"
-			"\"crawl_instance\" INT NOT NULL COMMENT 'Active crawler instance',"
+			"\"crawl_instance\" INT DEFAULT NULL COMMENT 'Active crawler instance',"
 			"\"root\" VARCHAR(32) NOT NULL COMMENT 'Hash of canonical root URI',"
 			"\"updated\" DATETIME DEFAULT NULL COMMENT 'Timestamp that this resource was updated in the cache',"
 			"\"added\" DATETIME NOT NULL COMMENT 'Timestamp that this resource was added',"
@@ -300,22 +313,6 @@ db_next(QUEUE *me, URI **next)
 }
 
 static int
-db_add_uri(QUEUE *me, URI *uri)
-{
-	char *uristr;
-	int r;
-	
-	uristr = uri_stralloc(uri);
-	if(!uristr)
-	{
-		return -1;
-	}
-	r = db_add_uristr(me, uristr);
-	free(uristr);
-	return r;
-}
-
-static int
 db_uristr_key_root(QUEUE *me, const char *uristr, char **uri, char *urikey, uint32_t *shortkey, char **root, char *rootkey)
 {
 	URI *u_resource, *u_root;
@@ -383,6 +380,22 @@ db_uristr_key_root(QUEUE *me, const char *uristr, char **uri, char *urikey, uint
 }
 
 static int
+db_add_uri(QUEUE *me, URI *uri)
+{
+	char *uristr;
+	int r;
+	
+	uristr = uri_stralloc(uri);
+	if(!uristr)
+	{
+		return -1;
+	}
+	r = db_add_uristr(me, uristr);
+	free(uristr);
+	return r;
+}
+
+static int
 db_add_uristr(QUEUE *me, const char *uristr)
 {
 	char *canonical, *root;
@@ -401,6 +414,22 @@ db_add_uristr(QUEUE *me, const char *uristr)
 	free(canonical);
 	return 0;
 	
+}
+
+static int
+db_updated_uri(QUEUE *me, URI *uri, time_t updated, time_t last_modified, int status, time_t ttl)
+{
+	char *uristr;
+	int r;
+	
+	uristr = uri_stralloc(uri);
+	if(!uristr)
+	{
+		return -1;
+	}
+	r = db_updated_uristr(me, uristr, updated, last_modified, status, ttl);
+	free(uristr);
+	return r;
 }
 
 static int
@@ -437,8 +466,6 @@ db_updated_uristr(QUEUE *me, const char *uristr, time_t updated, time_t last_mod
 	ttl += time(NULL);
 	gmtime_r(&ttl, &tm);
 	strftime(nextfetchstr, 32, "%Y-%m-%d %H:%M:%S", &tm);
-	log_printf(LOG_DEBUG, "UPDATE \"crawl_resource\" SET \"updated\" = %s, \"last_modified\" = %s, \"status\" = %d, \"next_fetch\" = %s, \"crawl_instance\" = NULL WHERE \"hash\" = %s\n",
-		updatedstr, lastmodstr, status, nextfetchstr, cachekey);
 	if(sql_executef(me->db, "UPDATE \"crawl_resource\" SET \"updated\" = %Q, \"last_modified\" = %Q, \"status\" = %d, \"next_fetch\" = %Q, \"crawl_instance\" = NULL WHERE \"hash\" = %Q",
 		updatedstr, lastmodstr, status, nextfetchstr, cachekey))
 	{
@@ -481,6 +508,72 @@ db_updated_uristr(QUEUE *me, const char *uristr, time_t updated, time_t last_mod
 	}	
 	free(root);
 	free(canonical);
+	return 0;
+}
+
+static int
+db_unchanged_uri(QUEUE *me, URI *uri, int error)
+{
+	char *uristr;
+	int r;
+	
+	uristr = uri_stralloc(uri);
+	if(!uristr)
+	{
+		return -1;
+	}
+	r = db_unchanged_uristr(me, uristr, error);
+	free(uristr);
+	return r;
+}
+
+static int
+db_unchanged_uristr(QUEUE *me, const char *uristr, int error)
+{
+	char *canonical, *root;
+	char cachekey[48], rootkey[48], updatedstr[32], nextfetchstr[32];
+	uint32_t shortkey;
+	struct tm tm;
+	time_t now, ttl;
+	
+	if(db_uristr_key_root(me, uristr, &canonical, cachekey, &shortkey, &root, rootkey))
+	{
+		return -1;
+	}	
+	now = time(NULL);
+	gmtime_r(&now, &tm);
+	strftime(updatedstr, 32, "%Y-%m-%d %H:%M:%S", &tm);
+	now += 2;
+	strftime(nextfetchstr, 32, "%Y-%m-%d %H:%M:%S", &tm);
+	if(sql_executef(me->db, "UPDATE \"crawl_root\" SET \"last_updated\" = %Q, \"earliest_update\" = %Q WHERE \"hash\" = %Q", updatedstr, nextfetchstr, rootkey))
+	{
+		log_printf(LOG_CRIT, "%s\n", sql_error(me->db));
+		exit(1);
+	}
+	if(error)
+	{
+		ttl = (86400 * 7) + now;
+		gmtime_r(&ttl, &tm);
+		strftime(nextfetchstr, 32, "%Y-%m-%d %H:%M:%S", &tm);
+		if(sql_executef(me->db, "UPDATE \"crawl_resource\" SET \"updated\" = %Q, \"next_fetch\" = %Q, \"crawl_instance\" = NULL, \"error_count\" = \"error_count\" + 1 WHERE \"hash\" = %Q",
+			updatedstr, nextfetchstr, cachekey))
+		{
+			log_printf(LOG_CRIT, "%s\n", sql_error(me->db));
+			exit(1);
+		}		
+	}
+	else
+	{
+		ttl = (3600 * 2) + now;
+		gmtime_r(&ttl, &tm);
+		strftime(nextfetchstr, 32, "%Y-%m-%d %H:%M:%S", &tm);
+		if(sql_executef(me->db, "UPDATE \"crawl_resource\" SET \"updated\" = %Q, \"next_fetch\" = %Q, \"crawl_instance\" = NULL, \"error_count\" = 0 WHERE \"hash\" = %Q",
+			updatedstr, nextfetchstr, cachekey))
+		{
+			log_printf(LOG_CRIT, "%s\n", sql_error(me->db));
+			exit(1);
+		}		
+	}
 	return 0;
 }
 

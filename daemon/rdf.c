@@ -77,7 +77,7 @@ rdf_create(CRAWL *crawler)
 		free(p);
 		return NULL;
 	}
-	crawl_set_accept(crawler, "text/turtle;q=1.0, application/rdf+xml;q=0.9, text/html;q=0.75");
+	crawl_set_accept(crawler, "text/turtle;q=1.0, application/rdf+xml;q=0.9, text/n3;q=0.8, text/plain;q=0.7");
 	return p;
 }
 

@@ -20,6 +20,8 @@
 
 #include "p_crawld.h"
 
+static int thread_prefetch(CRAWL *crawl, URI *uri, const char *uristr, void *userdata);
+
 int
 thread_create(int crawler_offset)
 {
@@ -49,7 +51,8 @@ thread_handler(void *arg)
 	crawl_set_verbose(crawler, config_get_int("crawl:verbose", 0));
 	processor_init_crawler(crawler, context);
 	queue_init_crawler(crawler, context);
-	policy_init_crawler(crawler);
+	policy_init_crawler(crawler, context);
+	crawl_set_prefetch(crawler, thread_prefetch);
 	
 	while(1)
 	{
@@ -66,4 +69,15 @@ thread_handler(void *arg)
 
 	context->api->release(context);
 	return NULL;
+}
+
+static int
+thread_prefetch(CRAWL *crawl, URI *uri, const char *uristr, void *userdata)
+{
+	(void) crawl;
+	(void) uri;
+	(void) userdata;
+	
+	log_printf(LOG_INFO, "Fetching %s\n", uristr);
+	return 0;
 }

@@ -91,6 +91,33 @@ queue_updated_uristr(CRAWL *crawl, const char *uristr, time_t updated, time_t la
 	return data->queue->api->updated_uristr(data->queue, uristr, updated, last_modified, status, ttl);
 }
 
+int
+queue_updated_uri(CRAWL *crawl, URI *uri, time_t updated, time_t last_modified, int status, time_t ttl)
+{
+	CONTEXT *data;
+	
+	data = crawl_userdata(crawl);	
+	return data->queue->api->updated_uri(data->queue, uri, updated, last_modified, status, ttl);
+}
+
+int
+queue_unchanged_uristr(CRAWL *crawl, const char *uristr, int error)
+{
+	CONTEXT *data;
+	
+	data = crawl_userdata(crawl);	
+	return data->queue->api->unchanged_uristr(data->queue, uristr, error);
+}
+
+int
+queue_unchanged_uri(CRAWL *crawl, URI *uri, int error)
+{
+	CONTEXT *data;
+	
+	data = crawl_userdata(crawl);	
+	return data->queue->api->unchanged_uri(data->queue, uri, error);
+}
+
 static int
 queue_handler(CRAWL *crawl, URI **next, void *userdata)
 {

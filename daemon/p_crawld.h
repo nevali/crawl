@@ -77,7 +77,10 @@ struct queue_api_struct
 	int (*next)(QUEUE *me, URI **next);
 	int (*add_uri)(QUEUE *me, URI *uri);
 	int (*add_uristr)(QUEUE *me, const char *uristr);
+	int (*updated_uri)(QUEUE *me, URI *uri, time_t updated, time_t last_modified, int status, time_t ttl);
 	int (*updated_uristr)(QUEUE *me, const char *uri, time_t updated, time_t last_modified, int status, time_t ttl);
+	int (*unchanged_uri)(QUEUE *me, URI *uri, int error);
+	int (*unchanged_uristr)(QUEUE *me, const char *uri, int error);
 };
 
 #ifndef PROCESSOR_STRUCT_DEFINED
@@ -111,9 +114,14 @@ int queue_init_crawler(CRAWL *crawler, CONTEXT *data);
 int queue_cleanup_crawler(CRAWL *crawler, CONTEXT *data);
 int queue_add_uristr(CRAWL *crawler, const char *str);
 int queue_add_uri(CRAWL *crawler, URI *uri);
+int queue_updated_uri(CRAWL *crawl, URI *uri, time_t updated, time_t last_modified, int status, time_t ttl);
 int queue_updated_uristr(CRAWL *crawl, const char *uristr, time_t updated, time_t last_modified, int status, time_t ttl);
+int queue_unchanged_uri(CRAWL *crawl, URI *uri, int error);
+int queue_unchanged_uristr(CRAWL *crawl, const char *uristr, int error);
 
-int policy_init_crawler(CRAWL *crawler);
+int policy_init(void);
+int policy_cleanup(void);
+int policy_init_crawler(CRAWL *crawler, CONTEXT *data);
 
 PROCESSOR *rdf_create(CRAWL *crawler);
 

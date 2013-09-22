@@ -51,7 +51,7 @@ main(int argc, char **argv)
 	}
 	log_set_use_config(1);
 	log_reset();
-
+	policy_init();
 	queue_init();
 	processor_init();
 

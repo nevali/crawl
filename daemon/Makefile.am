@@ -15,13 +15,20 @@
 
 EXTRA_DIST = crawl.conf.example
 
+AM_CPPFLAGS = @AM_CPPFLAGS@ @CPPFLAGS@ -I$(top_srcdir)/libsupport $(LIBRDF_CPPFLAGS) $(LIBSQL_CPPFLAGS)
+
+noinst_LTLIBRARIES = libcrawld.la
+
 sbin_PROGRAMS = crawld
 
 crawld_SOURCES = p_crawld.h \
-	crawld.c context.c thread.c processor.c queue.c policy.c \
+	crawld.c 
+crawld_LDADD = libcrawld.la
+
+libcrawld_la_SOURCES = p_crawld.h \
+	context.c thread.c processor.c queue.c policy.c \
 	rdf.c db.c
 
-crawld_CPPFLAGS = @AM_CPPFLAGS@ @CPPFLAGS@ -I$(top_srcdir)/libsupport $(LIBRDF_CPPFLAGS) $(LIBSQL_CPPFLAGS)
-crawld_LDADD = ../libcrawl.la ../libsupport/libsupport.la -lpthread $(LIBRDF_LIBS) $(LIBSQL_LOCAL_LIBS) $(LIBSQL_LIBS)
+libcrawld_la_LIBADD = ../libcrawl.la ../libsupport/libsupport.la -lpthread $(LIBRDF_LIBS) $(LIBSQL_LOCAL_LIBS) $(LIBSQL_LIBS)
 
 

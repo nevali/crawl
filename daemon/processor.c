@@ -21,6 +21,7 @@
 #include "p_crawld.h"
 
 static int processor_handler(CRAWL *crawl, CRAWLOBJ *obj, time_t prevtime, void *userdata);
+static int processor_unchanged_handler(CRAWL *crawl, CRAWLOBJ *obj, time_t prevtime, void *userdata);
 static int processor_failed_handler(CRAWL *crawl, CRAWLOBJ *obj, time_t prevtime, void *userdata);
 
 int
@@ -44,6 +45,7 @@ processor_init_crawler(CRAWL *crawl, CONTEXT *data)
 		return -1;
 	}
 	crawl_set_updated(crawl, processor_handler);
+	crawl_set_unchanged(crawl, processor_unchanged_handler);
 	crawl_set_failed(crawl, processor_failed_handler);
 	return 0;
 	return 0;
@@ -85,17 +87,6 @@ processor_handler(CRAWL *crawl, CRAWLOBJ *obj, time_t prevtime, void *userdata)
 	{
 		queue_add_uristr(crawl, location);
 	}
-	if(!crawl_obj_fresh(obj))
-	{
-		log_printf(LOG_DEBUG, "processor_handler: object has not been updated\n");
-		/* it's possible that the cache itself may be older than book-keeping which
-		 * depends upon it. at the very least we need to inform the queue that
-		 * the object has been processed: this should trigger some kind of state
-		 * checking to ensure that whatever is consuming the cached objects
-		 * knows about this resource.
-		 */
-//		return 0;
-	}
 	log_printf(LOG_DEBUG, "processor_handler: object has been updated\n");
 	r = pdata->api->process(pdata, obj, uri, content_type);
 	queue_updated_uristr(crawl, uri, crawl_obj_updated(obj), crawl_obj_updated(obj), crawl_obj_status(obj), 3600);
@@ -103,13 +94,26 @@ processor_handler(CRAWL *crawl, CRAWLOBJ *obj, time_t prevtime, void *userdata)
 }
 
 static int
-processor_failed_handler(CRAWL *crawl, CRAWLOBJ *obj, time_t prevtime, void *userdata)
+processor_unchanged_handler(CRAWL *crawl, CRAWLOBJ *obj, time_t prevtime, void *userdata)
 {
-	CONTEXT *data;
 	const char *uri;
 	
-	data = (CONTEXT *) userdata;
+	(void) obj;
+	(void) prevtime;
+	
 	uri = crawl_obj_uristr(obj);
-	queue_updated_uristr(crawl, uri, crawl_obj_updated(obj), crawl_obj_updated(obj), crawl_obj_status(obj), 3600);
-	return 0;
+	
+	log_printf(LOG_DEBUG, "processor_unchanged_handler: object has not been updated\n");
+	return queue_unchanged_uristr(crawl, uri, 0);
+}
+
+static int
+processor_failed_handler(CRAWL *crawl, CRAWLOBJ *obj, time_t prevtime, void *userdata)
+{
+	const char *uri;
+	
+	(void) prevtime;
+	
+	uri = crawl_obj_uristr(obj);
+	return queue_unchanged_uristr(crawl, uri, 1);
 }
